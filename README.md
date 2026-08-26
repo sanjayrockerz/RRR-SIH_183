@@ -62,3 +62,7 @@ This system is analysis-only: it never stores private keys, signs transactions, 
 ## Phase 7 — RRR Real-Time Retracing
 
 The realtime boundary is implemented with signed Alchemy Address Activity webhook intake, canonical event normalization, PostgreSQL idempotency, case-scoped watch targets, reorg-safe observations, incremental evidence/graph updates, and risk/pattern reassessment hooks. The API and UI report `NOT_CONFIGURED` until `ALCHEMY_API_KEY`, `ALCHEMY_WEBHOOK_ID`, and `ALCHEMY_WEBHOOK_SIGNING_KEY` are configured. WebSocket ingestion and automatic webhook registration are not enabled.
+
+## Phase 8 — Cross-chain intelligence
+
+The cross-chain boundary now supports chain-aware Ethereum/Tron models, a bounded TronGrid adapter, data-driven bridge definitions, explicit observed transfers versus inferred confidence-scored links, persistent cross-chain traces, and investigator APIs/UI. Tron and bridge functionality remain `NOT_CONFIGURED` until approved provider credentials and curated bridge definitions are supplied.

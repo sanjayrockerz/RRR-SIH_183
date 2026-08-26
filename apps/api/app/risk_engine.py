@@ -19,6 +19,8 @@ def default_risk_config() -> RiskScoringConfig:
         RiskFactorDefinition(id="entity:mixer",name="Mixer interaction",category="ENTITY_EXPOSURE",default_weight=25,max_contribution=35,explanation_template="Observed interaction with an address attributed to a mixer."),
         RiskFactorDefinition(id="entity:bridge",name="Bridge interaction",category="ENTITY_EXPOSURE",default_weight=8,max_contribution=12,explanation_template="Observed interaction with an address attributed to a bridge."),
         RiskFactorDefinition(id="entity:vasp",name="Entity exposure",category="ENTITY_EXPOSURE",default_weight=10,max_contribution=20,explanation_template="Observed a path reaching a source-backed attributed entity."),
+        RiskFactorDefinition(id="pattern:cross_chain_hop",name="Cross-chain hop",category="CROSS_CHAIN_BEHAVIOR",default_weight=12,max_contribution=20,explanation_template="Observed {count} evidence-backed cross-chain movement observation(s)."),
+        RiskFactorDefinition(id="pattern:bridge_hop",name="Bridge-mediated movement",category="CROSS_CHAIN_BEHAVIOR",default_weight=10,max_contribution=18,explanation_template="Observed bridge-mediated movement in {count} persisted observation(s)."),
         RiskFactorDefinition(id="graph:hop_depth",name="Graph hop depth",category="GRAPH_CHARACTERISTICS",default_weight=5,max_contribution=10,explanation_template="The bounded graph reached {hops} observed hops."),
     ]
     return RiskScoringConfig(version="phase6-default-v1",factors=definitions,thresholds=RiskBandThresholds())

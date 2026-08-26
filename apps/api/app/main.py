@@ -1,21 +1,24 @@
 from contextlib import asynccontextmanager
 import logging
+from datetime import datetime, timezone
+from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 import json
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .domain import *
 from .persistence import PostgresCaseRepository, DatabaseError
-from .provider import AlchemyEthereumProvider, ProviderError
+from .provider import AlchemyEthereumProvider, TronGridProvider, ProviderError
 from .services import TraceService
 from .attribution import AttributionEngine, NearestEntityResolver
 from .pattern_service import PatternService
 from .risk_service import RiskService
 from .realtime import AlchemyRealtimeAdapter
 from .realtime_service import RealtimeService
+from .cross_chain_service import CrossChainService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-provider=AlchemyEthereumProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo); risk_service=RiskService(repo); realtime_provider=AlchemyRealtimeAdapter(); realtime_service=RealtimeService(repo,realtime_provider,pattern_service,risk_service)
+provider=AlchemyEthereumProvider(); tron_provider=TronGridProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo); risk_service=RiskService(repo); cross_chain_service=CrossChainService(repo); realtime_provider=AlchemyRealtimeAdapter(); realtime_service=RealtimeService(repo,realtime_provider,pattern_service,risk_service,cross_chain_service)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -32,6 +35,14 @@ async def health():
 
 @app.get("/api/v1/provider/capabilities",response_model=list[ProviderCapability])
 async def capabilities(): return provider.capabilities()
+
+@app.get("/api/v1/chains",response_model=list[ChainCapability])
+async def chains(): return cross_chain_service.capabilities()
+
+@app.get("/api/v1/chains/{chain_id}",response_model=ChainCapability)
+async def chain_detail(chain_id: str):
+    try: return cross_chain_service.chain_registry.get(Chain(chain_id))
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
 
 @app.get("/api/v1/entities",response_model=list[Entity])
 async def list_entities():
@@ -323,4 +334,59 @@ async def case_changes(case_id: str):
 async def realtime_alerts(case_id: str):
     await get_case(case_id)
     try: return await repo.alerts(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/cross-chain/observations")
+async def cross_chain_observation(case_id: str, body: CrossChainObservationCreate):
+    try:
+        result=await cross_chain_service.ingest_observation(case_id,body)
+        logging.getLogger("crypto_fraud_intelligence").info("cross_chain_observation_ingested",extra={"case_id":case_id,"chain":body.transfer.chain,"tx_hash":body.transfer.tx_hash})
+        return {"status":"OBSERVED" if body.mode != DataMode.SIMULATED else "SIMULATED","persisted":bool(result)}
+    except ValueError as exc: raise HTTPException(422,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/cross-chain/analyze",response_model=CrossChainTrace)
+async def analyze_cross_chain(case_id: str, body: CrossChainAnalyzeRequest = CrossChainAnalyzeRequest()):
+    try:
+        result=await cross_chain_service.analyze(case_id,body)
+        await repo.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case_id,timestamp=datetime.now(timezone.utc),event_type="CROSS_CHAIN_ACTIVITY",summary=f"Cross-chain analysis completed across {len(result.chains_visited)} supported chain(s); relationships remain confidence-scored inferences.",source="CrossChainEngine",evidence_ids=list(dict.fromkeys(e for link in result.cross_chain_links for e in link.evidence_ids)),metadata={"trace_id":result.trace_id,"status":result.status,"cross_chain_hops":result.cross_chain_hops}))
+        try:
+            assessment=await risk_service.assess(case_id,RiskAssessRequest())
+            await repo.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case_id,timestamp=assessment.calculated_at,event_type="RISK_REASSESSED",summary=f"Risk posture reassessed with persisted cross-chain observations: {assessment.band} ({assessment.score:.1f}/100).",source="RuleBasedRiskEngine",evidence_ids=assessment.evidence_ids,metadata={"assessment_id":assessment.assessment_id,"delta":assessment.delta.delta if assessment.delta else 0}))
+        except ValueError:
+            pass
+        return result
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/cross-chain",response_model=CrossChainSummary)
+async def cross_chain_summary(case_id: str):
+    await get_case(case_id)
+    try: return await cross_chain_service.summary(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/cross-chain/links",response_model=list[CrossChainLink])
+async def cross_chain_links(case_id: str):
+    await get_case(case_id)
+    try: return await cross_chain_service.links(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/cross-chain/patterns",response_model=list[CrossChainPatternObservation])
+async def cross_chain_patterns(case_id: str):
+    await get_case(case_id)
+    try: return await cross_chain_service.patterns(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/cross-chain/paths")
+async def cross_chain_paths(case_id: str):
+    await get_case(case_id)
+    try:
+        links=await cross_chain_service.links(case_id)
+        return {"links":links,"paths":[],"note":"Persisted path reconstruction will be expanded from cross_chain_trace_edges; links retain source/destination evidence and confidence."}
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/cross-chain/timeline",response_model=list[TimelineEvent])
+async def cross_chain_timeline(case_id: str):
+    await get_case(case_id)
+    try: return [item for item in await repo.timeline(case_id) if item.event_type.startswith("CROSS_CHAIN") or item.event_type.startswith("BRIDGE")]
     except DatabaseError as exc: return database_failure(exc)

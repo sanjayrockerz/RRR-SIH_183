@@ -8,7 +8,7 @@ class CapabilityStatus(StrEnum):
 class DataMode(StrEnum):
     HISTORICAL = "HISTORICAL"; POLLING = "POLLING"; WEBHOOK = "WEBHOOK"; SUBSCRIPTION = "SUBSCRIPTION"; SIMULATED = "SIMULATED"
 
-class Chain(StrEnum): ETHEREUM = "ethereum"
+class Chain(StrEnum): ETHEREUM = "ethereum"; TRON = "tron"
 
 class EntityType(StrEnum):
     VASP="VASP"; EXCHANGE="EXCHANGE"; SERVICE="SERVICE"; MIXER="MIXER"; BRIDGE="BRIDGE"; PROTOCOL="PROTOCOL"; UNKNOWN="UNKNOWN"
@@ -21,6 +21,9 @@ class PatternType(StrEnum):
     RAPID_HOP="RAPID_HOP"; FAN_OUT="FAN_OUT"; FAN_IN="FAN_IN"; PEEL_CHAIN="PEEL_CHAIN"
     CONSOLIDATION="CONSOLIDATION"; BURST_ACTIVITY="BURST_ACTIVITY"; DORMANT_ACTIVATION="DORMANT_ACTIVATION"
     MIXER_INTERACTION="MIXER_INTERACTION"; BRIDGE_INTERACTION="BRIDGE_INTERACTION"; ENTITY_EXPOSURE="ENTITY_EXPOSURE"
+    CROSS_CHAIN_HOP="CROSS_CHAIN_HOP"; BRIDGE_HOP="BRIDGE_HOP"; RAPID_CROSS_CHAIN_MOVEMENT="RAPID_CROSS_CHAIN_MOVEMENT"
+    CROSS_CHAIN_FRAGMENTATION="CROSS_CHAIN_FRAGMENTATION"; CROSS_CHAIN_CONSOLIDATION="CROSS_CHAIN_CONSOLIDATION"
+    MULTI_CHAIN_PEEL_CHAIN="MULTI_CHAIN_PEEL_CHAIN"; CHAIN_SWITCH_AFTER_RISK_SIGNAL="CHAIN_SWITCH_AFTER_RISK_SIGNAL"; BRIDGE_TO_ENTITY_EXPOSURE="BRIDGE_TO_ENTITY_EXPOSURE"
 
 class PatternStatus(StrEnum): OBSERVED="OBSERVED"; POSSIBLE="POSSIBLE"; REVIEW_REQUIRED="REVIEW_REQUIRED"
 class PatternSeverity(StrEnum): INFO="INFO"; LOW="LOW"; MEDIUM="MEDIUM"; HIGH="HIGH"; CRITICAL="CRITICAL"
@@ -35,25 +38,26 @@ class CaseCreate(BaseModel):
     priority: str = "MEDIUM"
 
 class WalletCreate(BaseModel):
-    address: str = Field(min_length=42, max_length=42)
+    address: str = Field(min_length=34, max_length=42)
     chain: Chain = Chain.ETHEREUM
     @field_validator("address")
     @classmethod
     def valid_address(cls, value: str):
-        if not value.startswith("0x") or len(value) != 42 or any(c not in "0123456789abcdefABCDEF" for c in value[2:]): raise ValueError("Expected a 20-byte hexadecimal Ethereum address")
-        return value
+        if value.startswith("0x") and len(value) == 42 and all(c in "0123456789abcdefABCDEF" for c in value[2:]): return value
+        if value.startswith("T") and len(value) == 34 and all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in value): return value
+        raise ValueError("Expected a valid Ethereum or Tron address")
 
 class TransactionCreate(BaseModel):
-    tx_hash: str = Field(min_length=66, max_length=66)
+    tx_hash: str = Field(min_length=64, max_length=66)
     chain: Chain = Chain.ETHEREUM
     @field_validator("tx_hash")
     @classmethod
     def valid_hash(cls, value: str):
-        if not value.startswith("0x") or len(value) != 66 or any(c not in "0123456789abcdefABCDEF" for c in value[2:]): raise ValueError("Expected a 32-byte hexadecimal transaction hash")
-        return value
+        if (value.startswith("0x") and len(value) == 66 and all(c in "0123456789abcdefABCDEF" for c in value[2:])) or (len(value) == 64 and all(c in "0123456789abcdefABCDEF" for c in value)): return value
+        raise ValueError("Expected a 32-byte hexadecimal transaction hash")
 
 class TraceRequest(BaseModel):
-    address: str = Field(min_length=42, max_length=42)
+    address: str = Field(min_length=34, max_length=42)
     chain: Chain = Chain.ETHEREUM
     direction: TraceDirection = TraceDirection.FORWARD
     max_hops: int = Field(default=2, ge=0, le=6)
@@ -68,8 +72,8 @@ class TraceRequest(BaseModel):
     @field_validator("address")
     @classmethod
     def valid_address(cls, value: str):
-        if not value.startswith("0x") or len(value) != 42 or any(c not in "0123456789abcdefABCDEF" for c in value[2:]): raise ValueError("Expected a 20-byte hexadecimal Ethereum address")
-        return value
+        if (value.startswith("0x") and len(value) == 42 and all(c in "0123456789abcdefABCDEF" for c in value[2:])) or (value.startswith("T") and len(value) == 34 and all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in value)): return value
+        raise ValueError("Expected a valid Ethereum or Tron address")
 
 class Transfer(BaseModel):
     tx_hash: str; chain: Chain; block_number: int | None = None; timestamp: datetime | None = None
@@ -419,3 +423,217 @@ class RealtimeApplicationResult(BaseModel):
     graph_edge_id: str | None = None
     new_wallet: bool = False
     duplicate: bool = False
+
+# Phase 8: chain-aware forensic intelligence contracts. These models are kept
+# separate from the Phase 0-7 Ethereum graph contracts so existing API payloads
+# remain backward compatible while cross-chain identity is explicit.
+class ChainCapability(BaseModel):
+    chain_id: Chain
+    name: str
+    family: str
+    native_asset: str
+    address_format: str
+    explorer_base_url: str
+    block_time_seconds: float
+    finality_model: str
+    provider: str
+    historical_capability: CapabilityStatus
+    realtime_capability: CapabilityStatus
+    token_transfer_capability: CapabilityStatus
+    bridge_detection_capability: CapabilityStatus
+    note: str | None = None
+
+class ChainAddress(BaseModel):
+    chain: Chain
+    address: str
+    @field_validator("address")
+    @classmethod
+    def valid_chain_address(cls, value: str):
+        WalletCreate(address=value).valid_address(value)
+        return value
+
+class AssetIdentity(BaseModel):
+    chain: Chain
+    contract_address: str | None = None
+    symbol: str
+    decimals: int | None = None
+    canonical_asset_id: str
+    mapping_source: str
+    confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+
+class AssetMapping(BaseModel):
+    mapping_id: str
+    source: AssetIdentity
+    destination: AssetIdentity
+    confidence: ConfidenceLevel
+    mapping_source: str
+    version: str
+    evidence_ids: list[str] = []
+
+class BridgeDefinition(BaseModel):
+    bridge_id: str
+    name: str
+    supported_chains: list[Chain]
+    deposit_contracts: dict[Chain, list[str]] = {}
+    withdrawal_contracts: dict[Chain, list[str]] = {}
+    router_contracts: dict[Chain, list[str]] = {}
+    token_mappings: list[AssetMapping] = []
+    event_signatures: list[str] = []
+    confidence_policy: str = "Source-backed contract interaction only"
+    source: str
+    version: str
+
+class BridgeInteraction(BaseModel):
+    interaction_id: str
+    bridge_id: str
+    bridge_name: str
+    interaction_type: str
+    source_chain: Chain
+    destination_chain: Chain | None = None
+    transaction_hash: str
+    bridge_contract: str
+    source_address: str
+    recipient: str | None = None
+    asset: str
+    amount: str
+    timestamp: datetime | None = None
+    message_id: str | None = None
+    nonce: str | None = None
+    evidence_ids: list[str] = []
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    source: str
+    explanation: str
+    raw_reference: dict = {}
+
+class CrossChainLink(BaseModel):
+    link_id: str
+    source: ChainAddress
+    destination: ChainAddress | None = None
+    source_transaction_hash: str
+    destination_transaction_hash: str
+    bridge_id: str
+    correlation_id: str
+    correlation_level: str
+    confidence_score: float = Field(ge=0, le=1)
+    confidence_band: ConfidenceLevel
+    evidence_count: int = 0
+    correlation_reasons: list[str] = []
+    evidence_ids: list[str] = []
+    provenance_source: str
+    explanation: str
+    observed_or_inferred: str = "INFERRED"
+    created_at: datetime
+
+class CrossChainEvidence(BaseModel):
+    evidence_id: str
+    case_id: str
+    evidence_type: str
+    source_chain: Chain
+    destination_chain: Chain | None = None
+    source_transaction_hash: str | None = None
+    destination_transaction_hash: str | None = None
+    source: str
+    captured_at: datetime
+    provenance: str
+    observed_or_inferred: str
+    metadata: dict = {}
+
+class CrossChainNode(BaseModel):
+    node_id: str
+    chain: Chain
+    address: str
+    node_type: str = "WALLET"
+    metadata: dict = {}
+
+class CrossChainEdge(BaseModel):
+    edge_id: str
+    edge_type: str
+    source_node: str
+    destination_node: str
+    chain: Chain | None = None
+    destination_chain: Chain | None = None
+    transaction_hash: str | None = None
+    destination_transaction_hash: str | None = None
+    asset: str | None = None
+    amount: str | None = None
+    timestamp: datetime | None = None
+    bridge_id: str | None = None
+    link_id: str | None = None
+    confidence_band: ConfidenceLevel | None = None
+    evidence_ids: list[str] = []
+    observed_or_inferred: str = "OBSERVED"
+    metadata: dict = {}
+
+class CrossChainPath(BaseModel):
+    path_id: str
+    node_ids: list[str]
+    edge_ids: list[str]
+    chains: list[Chain]
+    confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+
+class CrossChainTrace(BaseModel):
+    trace_id: str
+    case_id: str
+    root: ChainAddress
+    chains_visited: list[Chain] = []
+    cross_chain_hops: int = 0
+    cross_chain_links: list[CrossChainLink] = []
+    nodes: list[CrossChainNode] = []
+    edges: list[CrossChainEdge] = []
+    paths: list[CrossChainPath] = []
+    status: str = "COMPLETED"
+    limitations: list[str] = []
+    max_hops: int = 8
+    max_cross_chain_hops: int = 2
+    max_nodes: int = 500
+    max_edges: int = 2000
+    max_bridge_interactions: int = 50
+    max_transactions: int = 500
+    provider_states: list[ProviderCapability] = []
+
+class CrossChainObservationCreate(BaseModel):
+    transfer: Transfer
+    mode: DataMode = DataMode.SIMULATED
+    bridge_contract: str | None = None
+    message_id: str | None = None
+    nonce: str | None = None
+    destination_chain: Chain | None = None
+    destination_address: str | None = None
+    source: str = "INVESTIGATOR"
+
+class CrossChainAnalyzeRequest(BaseModel):
+    chains: list[Chain] = [Chain.ETHEREUM, Chain.TRON]
+    root_chain: Chain = Chain.ETHEREUM
+    root_address: str | None = None
+    max_hops: int = Field(default=8, ge=1, le=20)
+    max_cross_chain_hops: int = Field(default=2, ge=0, le=5)
+    max_nodes: int = Field(default=500, ge=1, le=2000)
+    max_edges: int = Field(default=2000, ge=1, le=10000)
+    max_bridge_interactions: int = Field(default=50, ge=1, le=500)
+    max_transactions: int = Field(default=500, ge=1, le=5000)
+    max_duration: int = Field(default=60, ge=1, le=300)
+
+class CrossChainSummary(BaseModel):
+    chains: list[Chain] = []
+    cross_chain_movements: int = 0
+    bridge_interactions: int = 0
+    new_wallets: int = 0
+    unresolved_links: int = 0
+    strong_or_exact_links: int = 0
+    status: str = "NOT_ANALYZED"
+
+class CrossChainPatternObservation(BaseModel):
+    pattern_id: str
+    case_id: str
+    trace_id: str
+    pattern_type: str
+    status: PatternStatus = PatternStatus.OBSERVED
+    confidence_level: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    severity: PatternSeverity = PatternSeverity.INFO
+    description: str
+    explanation: str
+    link_ids: list[str] = []
+    evidence_ids: list[str] = []
+    metadata: dict = {}
+    fingerprint: str
+    observed_at: datetime

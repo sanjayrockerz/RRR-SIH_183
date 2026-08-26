@@ -19,6 +19,11 @@ class RiskService:
         trace=await self.repository.get_trace(case_id,request.trace_id) if request.trace_id else case.latest_trace
         if not trace: raise ValueError("No persisted trace for case")
         patterns=await self.repository.list_patterns(case_id,trace.trace_id)
+        try:
+            cross_patterns=await self.repository.cross_chain_patterns(case_id)
+            patterns.extend(PatternObservation(pattern_id=item.pattern_id,case_id=item.case_id,trace_id=trace.trace_id,pattern_type=item.pattern_type,status=item.status,confidence_level=item.confidence_level,severity=item.severity,description=item.description,explanation=item.explanation,observed_at=item.observed_at,affected_edges=item.link_ids,evidence_ids=item.evidence_ids,metadata=item.metadata,fingerprint=item.fingerprint) for item in cross_patterns)
+        except AttributeError:
+            pass
         entities,sources,records=await self.repository.attribution_catalog()
         attributions=NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
         address=(request.subject_address or trace.root_address).lower()

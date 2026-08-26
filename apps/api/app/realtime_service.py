@@ -9,12 +9,13 @@ from .realtime import AlchemyWebhookNormalizer, RealtimeProvider
 
 
 class RealtimeService:
-    def __init__(self, repository, provider: RealtimeProvider, pattern_service, risk_service):
+    def __init__(self, repository, provider: RealtimeProvider, pattern_service, risk_service, cross_chain_service=None):
         self.repository = repository
         self.provider = provider
         self.pattern_service = pattern_service
         self.risk_service = risk_service
         self.normalizer = AlchemyWebhookNormalizer()
+        self.cross_chain_service = cross_chain_service
 
     async def create_watch(self, case_id: str, request: WatchCreate) -> WatchTarget:
         if not await self.repository.get(case_id):
@@ -88,6 +89,13 @@ class RealtimeService:
         now = application.event.observed_at or application.event.received_at
         evidence_ids = [application.evidence_id] if application.evidence_id else []
         await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()), case_id=case.case_id, timestamp=now, event_type="BLOCKCHAIN_ACTIVITY", summary=f"Observed {application.event.asset} movement {application.event.from_address} → {application.event.to_address} from {application.event.provider}.", source=application.event.provider, evidence_ids=evidence_ids, metadata={"transaction_hash": application.event.transaction_hash, "confirmation_state": application.event.confirmation_state}))
+        if self.cross_chain_service:
+            try:
+                cross_trace=await self.cross_chain_service.analyze(case.case_id,CrossChainAnalyzeRequest(root_chain=application.event.chain,root_address=application.event.from_address,max_hops=4,max_cross_chain_hops=1,max_nodes=100,max_edges=200,max_transactions=100))
+                if cross_trace.cross_chain_links:
+                    await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case.case_id,timestamp=now,event_type="CROSS_CHAIN_ACTIVITY",summary="Cross-chain relationship analysis updated from the new observed event; relationships are explicit confidence-scored inferences.",source="CrossChainEngine",evidence_ids=list(dict.fromkeys(e for link in cross_trace.cross_chain_links for e in link.evidence_ids)),metadata={"trace_id":cross_trace.trace_id,"cross_chain_hops":cross_trace.cross_chain_hops}))
+            except ValueError:
+                pass
         if case.latest_trace:
             try:
                 attributions = await self._case_attributions(case.latest_trace)

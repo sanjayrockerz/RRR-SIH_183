@@ -7,11 +7,12 @@ from .domain import *
 from .services import CaseRepository
 from .risk_persistence import RiskPersistenceMixin
 from .realtime_persistence import RealtimePersistenceMixin
+from .cross_chain_persistence import CrossChainPersistenceMixin
 
 class DatabaseError(RuntimeError):
     """Database failures safe to translate at the HTTP boundary."""
 
-class PostgresCaseRepository(RealtimePersistenceMixin, RiskPersistenceMixin, CaseRepository):
+class PostgresCaseRepository(CrossChainPersistenceMixin, RealtimePersistenceMixin, RiskPersistenceMixin, CaseRepository):
     def __init__(self): self.pool: asyncpg.Pool | None = None
     async def connect(self):
         try:

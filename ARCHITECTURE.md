@@ -15,3 +15,7 @@ Phase 6 adds deterministic `RiskEngine` assessment over persisted patterns, sour
 ## Phase 7 — Real-time retracing
 
 Realtime events enter through a signed provider adapter, are deduplicated in PostgreSQL, and update existing transactions, evidence, graph edges, patterns, risk assessments, timeline, and alert candidates. No polling loop or unsupported live claim is introduced.
+
+## Phase 8 — Cross-chain intelligence
+
+Cross-chain node identity is chain-qualified. Observed normalized transfers remain distinct from inferred bridge links, which carry correlation confidence, reasons, provenance, and evidence. Ethereum uses Alchemy; TronGrid is available as a bounded historical adapter but reports `NOT_CONFIGURED` without credentials. See [cross-chain-intelligence.md](docs/architecture/cross-chain-intelligence.md).

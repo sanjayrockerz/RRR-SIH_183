@@ -47,6 +47,15 @@ class CaseRepository:
     async def append_change_set(self, change_set:InvestigationChangeSet)->None: raise NotImplementedError
     async def create_alert(self, alert:Alert, fingerprint:str)->Alert|None: raise NotImplementedError
     async def get_realtime_event(self, event_id:str)->RealtimeEvent|None: raise NotImplementedError
+    async def persist_cross_chain_observation(self,case_id:str,observation:CrossChainObservationCreate): raise NotImplementedError
+    async def cross_chain_transfers(self,case_id:str)->list[Transfer]: raise NotImplementedError
+    async def persist_bridge_definition(self,definition:BridgeDefinition): raise NotImplementedError
+    async def persist_bridge_interaction(self,case_id:str,item:BridgeInteraction): raise NotImplementedError
+    async def persist_cross_chain_link(self,case_id:str,link:CrossChainLink): raise NotImplementedError
+    async def persist_cross_chain_trace(self,trace:CrossChainTrace): raise NotImplementedError
+    async def cross_chain_links(self,case_id:str)->list[CrossChainLink]: raise NotImplementedError
+    async def persist_cross_chain_patterns(self,patterns:list[CrossChainPatternObservation]): raise NotImplementedError
+    async def cross_chain_patterns(self,case_id:str)->list[CrossChainPatternObservation]: raise NotImplementedError
 
 class TraceService:
     def __init__(self,provider:BlockchainProvider):

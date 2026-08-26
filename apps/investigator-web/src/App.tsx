@@ -4,6 +4,7 @@ import {GraphInspector} from './components/GraphInspector';
 import {PatternsPage} from './components/PatternsPage';
 import {RiskPage} from './components/RiskPage';
 import {RealtimePage} from './components/RealtimePage';
+import {CrossChainPage} from './components/CrossChainPage';
 import {api} from './api';
 import type {Case,Trace} from './types';
 import {Dashboard,GenericPage,Intake,Workspace} from './pages';
@@ -24,6 +25,7 @@ export default function App(){
  else if(route==='patterns'&&caseData&&trace) page=<PatternsPage caseData={caseData} trace={trace} onNavigate={navigate}/>;
  else if(route==='risk'&&caseData&&trace) page=<RiskPage caseData={caseData} trace={trace} onNavigate={navigate}/>;
  else if((route==='monitoring'||route==='realtime')&&caseData&&trace) page=<RealtimePage caseData={caseData} trace={trace}/>;
+ else if((route==='cross-chain'||route==='chains')&&caseData&&trace) page=<CrossChainPage caseData={caseData} trace={trace}/>;
  else if(route==='cases') page=<GenericPage eyebrow="INVESTIGATIONS / CASES" title="Case registry" text="Case index APIs are not yet configured in this environment. Open a new investigation to create a persisted case."/>;
  else if(route==='wallets') page=<GenericPage eyebrow="INTELLIGENCE / WALLET" title="Wallet intelligence" text="Search and inspect observed address activity, related cases, attribution and evidence."/>;
  else if(route==='entities') page=<GenericPage eyebrow="INTELLIGENCE / ENTITIES" title="Entities / VASPs" text="Source-backed entity attribution will appear here. No ownership or regulatory conclusion is implied."/>;
