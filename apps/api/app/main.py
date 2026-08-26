@@ -229,7 +229,7 @@ async def case_risk_alerts(case_id: str, subject_id: str | None = None):
 
 @app.get("/api/v1/wallets/{wallet_id}/risk",response_model=list[RiskAssessment])
 async def wallet_risk(wallet_id: str):
-    try: return await risk_service.subject(wallet_id)
+    try: return await risk_service.wallet(wallet_id)
     except DatabaseError as exc: return database_failure(exc)
 
 @app.get("/api/v1/traces/{trace_id}/risk",response_model=list[RiskAssessment])

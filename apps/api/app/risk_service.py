@@ -37,6 +37,7 @@ class RiskService:
     async def history(self,case_id:str,subject_id:str|None=None): return await self.repository.risk_history(case_id,subject_id)
     async def trace(self,trace_id:str): return await self.repository.risk_by_trace(trace_id)
     async def subject(self,subject_id:str): return await self.repository.risk_by_subject(subject_id)
+    async def wallet(self,wallet_id:str): return await self.repository.risk_by_wallet(wallet_id)
     async def factors(self,case_id:str,assessment_id:str|None=None): return await self.repository.risk_factors(case_id,assessment_id)
     async def alerts(self,case_id:str,subject_id:str|None=None): return await self.repository.risk_alerts(case_id,subject_id)
 

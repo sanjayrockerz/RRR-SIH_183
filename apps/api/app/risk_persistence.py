@@ -112,6 +112,19 @@ class RiskPersistenceMixin:
             return result
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Subject risk could not be retrieved") from exc
 
+    async def risk_by_wallet(self, wallet_id: str):
+        from .persistence import DatabaseError
+        pool=self._require_pool()
+        try:
+            async with pool.acquire() as conn:
+                rows=await conn.fetch("SELECT ra.case_id,ra.assessment_id FROM risk_assessments ra JOIN wallets w ON w.address=ra.subject_address AND w.chain=ra.subject_chain WHERE w.wallet_id=$1 ORDER BY ra.calculated_at DESC",UUID(wallet_id))
+            result=[]
+            for row in rows:
+                item=await self._load_risk(str(row["case_id"]),str(row["assessment_id"]))
+                if item: result.append(item)
+            return result
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Wallet risk could not be retrieved") from exc
+
     async def risk_factors(self, case_id: str, assessment_id: str | None = None):
         assessment=await self.latest_risk(case_id) if not assessment_id else await self._load_risk(case_id,assessment_id)
         return assessment.factors if assessment else []

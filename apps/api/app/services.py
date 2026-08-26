@@ -28,6 +28,7 @@ class CaseRepository:
     async def risk_history(self, case_id:str, subject_id:str|None=None)->list[RiskAssessment]: raise NotImplementedError
     async def risk_by_trace(self, trace_id:str)->list[RiskAssessment]: raise NotImplementedError
     async def risk_by_subject(self, subject_id:str)->list[RiskAssessment]: raise NotImplementedError
+    async def risk_by_wallet(self, wallet_id:str)->list[RiskAssessment]: raise NotImplementedError
     async def persist_risk(self, assessment:RiskAssessment, alerts:list[RiskAlertCandidate])->RiskAssessment: raise NotImplementedError
     async def risk_factors(self, case_id:str, assessment_id:str|None=None)->list[RiskFactor]: raise NotImplementedError
     async def risk_alerts(self, case_id:str, subject_id:str|None=None)->list[RiskAlertCandidate]: raise NotImplementedError
