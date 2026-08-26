@@ -1,0 +1,3 @@
+# Provider abstraction
+
+BlockchainProvider extends the BlockchainDataFabric contract and returns normalized domain observations plus capability metadata. Alchemy is an infrastructure adapter only. Historical transfer retrieval follows Alchemy's pageKey cursor and is bounded by configured page size, maximum pages, and maximum transactions. Capabilities distinguish supported, unsupported, simulated, and not configured; address history, transaction lookup, receipt lookup, and block lookup are supported when ALCHEMY_API_KEY is present. Webhooks and subscriptions are unsupported and are not represented as real-time.
