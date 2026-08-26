@@ -59,3 +59,6 @@ The investigator web also provides the current workstation shell, dashboard, man
 ## Safety boundary
 
 This system is analysis-only: it never stores private keys, signs transactions, or transfers funds. Attribution is separate from fact, and analytical signals always retain supporting evidence references.
+## Phase 7 — RRR Real-Time Retracing
+
+The realtime boundary is implemented with signed Alchemy Address Activity webhook intake, canonical event normalization, PostgreSQL idempotency, case-scoped watch targets, reorg-safe observations, incremental evidence/graph updates, and risk/pattern reassessment hooks. The API and UI report `NOT_CONFIGURED` until `ALCHEMY_API_KEY`, `ALCHEMY_WEBHOOK_ID`, and `ALCHEMY_WEBHOOK_SIGNING_KEY` are configured. WebSocket ingestion and automatic webhook registration are not enabled.

@@ -313,3 +313,109 @@ class AuditEvent(BaseModel):
     actor_id: str | None = None
     occurred_at: datetime
     metadata: dict = {}
+
+class RealtimeEventType(StrEnum): ADDRESS_ACTIVITY="ADDRESS_ACTIVITY"; REORG="REORG"
+class RealtimeProcessingStatus(StrEnum): RECEIVED="RECEIVED"; VALIDATED="VALIDATED"; NORMALIZED="NORMALIZED"; APPLIED="APPLIED"; DUPLICATE="DUPLICATE"; REJECTED="REJECTED"; FAILED="FAILED"; RETRY_PENDING="RETRY_PENDING"
+class ConfirmationState(StrEnum): OBSERVED="OBSERVED"; CONFIRMED="CONFIRMED"; REORGED="REORGED"
+class WatchTargetStatus(StrEnum): ACTIVE="ACTIVE"; PAUSED="PAUSED"; STOPPED="STOPPED"; ERROR="ERROR"
+class WatchExpansionPolicy(StrEnum): MANUAL="MANUAL"; CASE_DEFAULT="CASE_DEFAULT"; HIGH_CONFIDENCE="HIGH_CONFIDENCE"; RISK_TRIGGERED="RISK_TRIGGERED"
+class AlertStatus(StrEnum): NEW="NEW"; ACKNOWLEDGED="ACKNOWLEDGED"; DISMISSED="DISMISSED"; ESCALATED="ESCALATED"
+
+class RealtimeEvent(BaseModel):
+    event_id: str
+    provider: str
+    provider_event_id: str | None = None
+    chain: Chain
+    event_type: RealtimeEventType = RealtimeEventType.ADDRESS_ACTIVITY
+    received_at: datetime
+    observed_at: datetime | None = None
+    block_number: int | None = None
+    block_hash: str | None = None
+    transaction_hash: str
+    transfer_index: int | None = None
+    from_address: str
+    to_address: str
+    asset: str
+    amount: str
+    contract_address: str | None = None
+    token_id: str | None = None
+    raw_provider_reference: dict = {}
+    processing_status: RealtimeProcessingStatus = RealtimeProcessingStatus.RECEIVED
+    confirmation_state: ConfirmationState = ConfirmationState.OBSERVED
+    removed: bool = False
+    error: str | None = None
+
+class WatchCreate(BaseModel):
+    address: str = Field(min_length=42,max_length=42)
+    chain: Chain = Chain.ETHEREUM
+    source: str = "INVESTIGATOR"
+    expansion_policy: WatchExpansionPolicy = WatchExpansionPolicy.MANUAL
+    max_hops: int = Field(default=2,ge=0,le=6)
+    max_new_nodes_per_event: int = Field(default=25,ge=1,le=500)
+    max_new_edges_per_event: int = Field(default=100,ge=1,le=2000)
+    max_value: float = Field(default=0,ge=0)
+    allowed_assets: list[str] = []
+
+class WatchTarget(BaseModel):
+    watch_id: str
+    case_id: str
+    address: str
+    chain: Chain
+    source: str
+    created_at: datetime
+    status: WatchTargetStatus
+    provider: str
+    subscription_id: str | None = None
+    last_event_at: datetime | None = None
+    last_processed_block: int | None = None
+    last_processed_event: str | None = None
+    expansion_policy: WatchExpansionPolicy = WatchExpansionPolicy.MANUAL
+    max_hops: int = 2
+    max_new_nodes_per_event: int = 25
+    max_new_edges_per_event: int = 100
+    max_value: float = 0
+    allowed_assets: list[str] = []
+    error: str | None = None
+
+class TimelineEvent(BaseModel):
+    event_id: str
+    case_id: str
+    timestamp: datetime
+    event_type: str
+    summary: str
+    source: str
+    evidence_ids: list[str] = []
+    metadata: dict = {}
+
+class InvestigationChangeSet(BaseModel):
+    change_set_id: str
+    case_id: str
+    event_id: str
+    created_at: datetime
+    before: dict = {}
+    after: dict = {}
+    changes: dict = {}
+
+class Alert(BaseModel):
+    alert_id: str
+    case_id: str
+    subject_id: str
+    alert_type: str
+    title: str
+    explanation: str
+    severity: RiskBand
+    status: AlertStatus = AlertStatus.NEW
+    risk_delta: float = 0
+    pattern_ids: list[str] = []
+    evidence_ids: list[str] = []
+    created_at: datetime
+
+class RealtimeApplicationResult(BaseModel):
+    event: RealtimeEvent
+    case_id: str
+    watch_id: str
+    transaction_id: str | None = None
+    evidence_id: str | None = None
+    graph_edge_id: str | None = None
+    new_wallet: bool = False
+    duplicate: bool = False

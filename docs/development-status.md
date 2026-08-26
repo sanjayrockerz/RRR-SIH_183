@@ -37,6 +37,12 @@ IMPLEMENTED for deterministic historical risk reassessment over persisted eviden
 - Watch status is a readiness field; monitoring lifecycle actions are future Phase 7 work.
 - Evidence ledger UI remains the existing capability surface; dedicated risk-to-ledger navigation is a future UI refinement.
 
-## Next phase
+## PHASE 7 — RRR REAL-TIME RETRACING
 
-PHASE 7 — RRR REAL-TIME RETRACING
+Status: IMPLEMENTED BOUNDARY / LIVE DEPENDS ON CONFIGURATION
+
+Implemented: canonical realtime events, HMAC-validated Alchemy webhook intake, idempotent PostgreSQL event storage, case-scoped watch targets, reorg-safe observation handling, incremental transaction/transfer/evidence/graph application, timeline/change sets, reassessment hooks, and investigator monitoring workspace.
+
+Known limitations: Alchemy webhook registration is provisioned outside this repository; WebSocket ingestion and confirmation-depth reconciliation are not enabled; automatic recursive watch expansion is not enabled; PostgreSQL runtime validation depends on an available database.
+
+Next phase: PHASE 8 — CROSS-CHAIN INTELLIGENCE.

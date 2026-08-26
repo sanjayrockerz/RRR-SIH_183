@@ -29,8 +29,10 @@ class AlchemyEthereumProvider(BlockchainProvider):
             ProviderCapability(name="transaction_receipt", status=status, mode=DataMode.HISTORICAL, note="eth_getTransactionReceipt with gas/status fields."),
             ProviderCapability(name="block", status=status, mode=DataMode.HISTORICAL, note="eth_getBlockByNumber with timestamp and hash."),
             ProviderCapability(name="token_transfers", status=status, mode=DataMode.HISTORICAL, note="Returned as normalized transfer rows from alchemy_getAssetTransfers."),
-            ProviderCapability(name="websocket_subscription", status=CapabilityStatus.UNSUPPORTED, mode=DataMode.SUBSCRIPTION, note="Not implemented in Phase 2."),
-            ProviderCapability(name="webhook_events", status=CapabilityStatus.UNSUPPORTED, mode=DataMode.WEBHOOK, note="Not implemented in Phase 2."),
+            ProviderCapability(name="websocket_subscription", status=CapabilityStatus.UNSUPPORTED, mode=DataMode.SUBSCRIPTION, note="Alchemy WebSocket event adapter is not enabled."),
+            ProviderCapability(name="webhook_events", status=CapabilityStatus.SUPPORTED if (settings.alchemy_api_key and settings.alchemy_webhook_id and settings.alchemy_webhook_signing_key) else CapabilityStatus.NOT_CONFIGURED, mode=DataMode.WEBHOOK, note="Alchemy Notify Address Activity webhook ingestion endpoint."),
+            ProviderCapability(name="incremental_retracing", status=CapabilityStatus.SUPPORTED if (settings.alchemy_api_key and settings.alchemy_webhook_id and settings.alchemy_webhook_signing_key) else CapabilityStatus.NOT_CONFIGURED, mode=DataMode.WEBHOOK, note="Incremental graph, pattern, and risk processing after webhook configuration."),
+            ProviderCapability(name="realtime_alerts", status=CapabilityStatus.SUPPORTED if (settings.alchemy_api_key and settings.alchemy_webhook_id and settings.alchemy_webhook_signing_key) else CapabilityStatus.NOT_CONFIGURED, mode=DataMode.WEBHOOK, note="Evidence-backed internal investigative alert candidates."),
         ]
 
     def _url(self):

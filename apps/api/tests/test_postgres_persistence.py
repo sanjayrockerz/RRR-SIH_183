@@ -19,6 +19,7 @@ async def test_persistent_core_survives_reconnect():
     await conn.execute((migrations / "004_entity_attribution.sql").read_text())
     await conn.execute((migrations / "005_fraud_patterns.sql").read_text())
     await conn.execute((migrations / "006_risk_intelligence.sql").read_text())
+    await conn.execute((migrations / "007_realtime_retracing.sql").read_text())
     repo=PostgresCaseRepository(); repo.pool=await asyncpg.create_pool(database_url)
     try:
         first=await repo.create(CaseCreate(title="Persistence one",fraud_type="Phishing"))

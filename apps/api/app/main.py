@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+import json
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .domain import *
@@ -10,9 +11,11 @@ from .services import TraceService
 from .attribution import AttributionEngine, NearestEntityResolver
 from .pattern_service import PatternService
 from .risk_service import RiskService
+from .realtime import AlchemyRealtimeAdapter
+from .realtime_service import RealtimeService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-provider=AlchemyEthereumProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo); risk_service=RiskService(repo)
+provider=AlchemyEthereumProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo); risk_service=RiskService(repo); realtime_provider=AlchemyRealtimeAdapter(); realtime_service=RealtimeService(repo,realtime_provider,pattern_service,risk_service)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -235,4 +238,89 @@ async def wallet_risk(wallet_id: str):
 @app.get("/api/v1/traces/{trace_id}/risk",response_model=list[RiskAssessment])
 async def trace_risk(trace_id: str):
     try: return await risk_service.trace(trace_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/realtime/capabilities", response_model=list[ProviderCapability])
+async def realtime_capabilities():
+    return realtime_service.capabilities()
+
+@app.get("/api/v1/realtime/health")
+async def realtime_health():
+    return await realtime_service.health()
+
+@app.post("/api/v1/cases/{case_id}/watches", response_model=WatchTarget)
+async def create_watch(case_id: str, body: WatchCreate):
+    try:
+        result=await realtime_service.create_watch(case_id,body)
+        logging.getLogger("crypto_fraud_intelligence").info("watch_started",extra={"case_id":case_id,"watch_id":result.watch_id,"status":result.status})
+        return result
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/watches", response_model=list[WatchTarget])
+async def list_watches(case_id: str):
+    await get_case(case_id)
+    try: return await realtime_service.watches(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/watches/{watch_id}/pause", response_model=WatchTarget)
+async def pause_watch(case_id: str, watch_id: str):
+    try: return await realtime_service.set_status(case_id,watch_id,WatchTargetStatus.PAUSED)
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/watches/{watch_id}/resume", response_model=WatchTarget)
+async def resume_watch(case_id: str, watch_id: str):
+    try: return await realtime_service.set_status(case_id,watch_id,WatchTargetStatus.ACTIVE)
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.delete("/api/v1/cases/{case_id}/watches/{watch_id}", response_model=WatchTarget)
+async def stop_watch(case_id: str, watch_id: str):
+    try: return await realtime_service.set_status(case_id,watch_id,WatchTargetStatus.STOPPED)
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/realtime/providers/alchemy/webhook")
+async def alchemy_webhook(request: Request):
+    raw=await request.body()
+    if len(raw)>settings.realtime_max_payload_bytes: raise HTTPException(413,"Webhook payload is too large")
+    signature=request.headers.get("x-alchemy-signature")
+    try: payload=json.loads(raw)
+    except json.JSONDecodeError as exc: raise HTTPException(400,"Malformed webhook JSON") from exc
+    try: return {"mode":DataMode.WEBHOOK,"events":await realtime_service.receive_webhook(payload,raw,signature)}
+    except PermissionError as exc: raise HTTPException(401,str(exc)) from exc
+    except ValueError as exc: raise HTTPException(400,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/realtime/simulated/events")
+async def simulated_realtime_event(body: RealtimeEvent):
+    try: return {"mode":DataMode.SIMULATED,"results":await realtime_service.receive_simulated(body)}
+    except ValueError as exc: raise HTTPException(422,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/realtime/events/{event_id}", response_model=RealtimeEvent)
+async def realtime_event(event_id: str):
+    try:
+        result=await repo.get_realtime_event(event_id)
+        if not result: raise HTTPException(404,"Realtime event not found")
+        return result
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/timeline", response_model=list[TimelineEvent])
+async def case_timeline(case_id: str):
+    await get_case(case_id)
+    try: return await repo.timeline(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/changes", response_model=list[InvestigationChangeSet])
+async def case_changes(case_id: str):
+    await get_case(case_id)
+    try: return await repo.change_sets(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/alerts", response_model=list[Alert])
+async def realtime_alerts(case_id: str):
+    await get_case(case_id)
+    try: return await repo.alerts(case_id)
     except DatabaseError as exc: return database_failure(exc)

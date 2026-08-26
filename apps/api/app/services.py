@@ -33,6 +33,20 @@ class CaseRepository:
     async def risk_factors(self, case_id:str, assessment_id:str|None=None)->list[RiskFactor]: raise NotImplementedError
     async def risk_alerts(self, case_id:str, subject_id:str|None=None)->list[RiskAlertCandidate]: raise NotImplementedError
     async def append_audit_event(self, event:AuditEvent)->None: raise NotImplementedError
+    async def create_watch(self, watch:WatchTarget)->WatchTarget: raise NotImplementedError
+    async def list_watches(self, case_id:str)->list[WatchTarget]: raise NotImplementedError
+    async def list_all_watches(self, chain:Chain|None=None)->list[WatchTarget]: raise NotImplementedError
+    async def get_watch(self, case_id:str, watch_id:str)->WatchTarget|None: raise NotImplementedError
+    async def update_watch(self, watch:WatchTarget)->WatchTarget: raise NotImplementedError
+    async def ingest_realtime_event(self, event:RealtimeEvent)->tuple[RealtimeEvent,bool]: raise NotImplementedError
+    async def apply_realtime_event(self, event:RealtimeEvent, watch:WatchTarget)->RealtimeApplicationResult: raise NotImplementedError
+    async def timeline(self, case_id:str)->list[TimelineEvent]: raise NotImplementedError
+    async def change_sets(self, case_id:str)->list[InvestigationChangeSet]: raise NotImplementedError
+    async def alerts(self, case_id:str)->list[Alert]: raise NotImplementedError
+    async def append_timeline(self, event:TimelineEvent)->None: raise NotImplementedError
+    async def append_change_set(self, change_set:InvestigationChangeSet)->None: raise NotImplementedError
+    async def create_alert(self, alert:Alert, fingerprint:str)->Alert|None: raise NotImplementedError
+    async def get_realtime_event(self, event_id:str)->RealtimeEvent|None: raise NotImplementedError
 
 class TraceService:
     def __init__(self,provider:BlockchainProvider):
