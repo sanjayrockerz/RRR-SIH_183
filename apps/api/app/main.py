@@ -9,9 +9,10 @@ from .provider import AlchemyEthereumProvider, ProviderError
 from .services import TraceService
 from .attribution import AttributionEngine, NearestEntityResolver
 from .pattern_service import PatternService
+from .risk_service import RiskService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-provider=AlchemyEthereumProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo)
+provider=AlchemyEthereumProvider(); repo=PostgresCaseRepository(); tracer=TraceService(provider); pattern_service=PatternService(repo); risk_service=RiskService(repo)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -188,4 +189,50 @@ async def read_pattern(case_id: str, pattern_id: str):
 async def list_trace_patterns(trace_id: str):
     try:
         return await pattern_service.list_by_trace(trace_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/risk/assess",response_model=RiskAssessment)
+async def assess_case_risk(case_id: str, body: RiskAssessRequest = RiskAssessRequest()):
+    try: return await risk_service.assess(case_id,body)
+    except ValueError as exc: raise HTTPException(404,str(exc)) from exc
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/risk",response_model=RiskAssessment|None)
+async def current_case_risk(case_id: str, subject_id: str | None = None):
+    await get_case(case_id)
+    try: return await risk_service.latest(case_id,subject_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/risk/history",response_model=list[RiskAssessment])
+async def case_risk_history(case_id: str, subject_id: str | None = None):
+    await get_case(case_id)
+    try: return await risk_service.history(case_id,subject_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/risk/delta",response_model=RiskDelta|None)
+async def case_risk_delta(case_id: str, subject_id: str | None = None):
+    await get_case(case_id)
+    try: return await risk_service.delta(case_id,subject_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/risk/factors",response_model=list[RiskFactor])
+async def case_risk_factors(case_id: str, assessment_id: str | None = None):
+    await get_case(case_id)
+    try: return await risk_service.factors(case_id,assessment_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/risk/alerts",response_model=list[RiskAlertCandidate])
+async def case_risk_alerts(case_id: str, subject_id: str | None = None):
+    await get_case(case_id)
+    try: return await risk_service.alerts(case_id,subject_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/wallets/{wallet_id}/risk",response_model=list[RiskAssessment])
+async def wallet_risk(wallet_id: str):
+    try: return await risk_service.subject(wallet_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/traces/{trace_id}/risk",response_model=list[RiskAssessment])
+async def trace_risk(trace_id: str):
+    try: return await risk_service.trace(trace_id)
     except DatabaseError as exc: return database_failure(exc)

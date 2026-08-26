@@ -5,5 +5,7 @@ import './styles.css';
 import './graph.css';
 import './app.css';
 import './pattern.css';
+import './risk.css';
+import './risk-overlay.css';
 
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

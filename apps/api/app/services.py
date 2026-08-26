@@ -24,6 +24,14 @@ class CaseRepository:
     async def list_patterns_by_trace(self, trace_id:str)->list[PatternObservation]: raise NotImplementedError
     async def get_pattern(self, case_id:str, pattern_id:str)->PatternObservation|None: raise NotImplementedError
     async def pattern_summary(self, case_id:str, trace_id:str|None=None)->PatternSummary: raise NotImplementedError
+    async def latest_risk(self, case_id:str, subject_id:str|None=None)->RiskAssessment|None: raise NotImplementedError
+    async def risk_history(self, case_id:str, subject_id:str|None=None)->list[RiskAssessment]: raise NotImplementedError
+    async def risk_by_trace(self, trace_id:str)->list[RiskAssessment]: raise NotImplementedError
+    async def risk_by_subject(self, subject_id:str)->list[RiskAssessment]: raise NotImplementedError
+    async def persist_risk(self, assessment:RiskAssessment, alerts:list[RiskAlertCandidate])->RiskAssessment: raise NotImplementedError
+    async def risk_factors(self, case_id:str, assessment_id:str|None=None)->list[RiskFactor]: raise NotImplementedError
+    async def risk_alerts(self, case_id:str, subject_id:str|None=None)->list[RiskAlertCandidate]: raise NotImplementedError
+    async def append_audit_event(self, event:AuditEvent)->None: raise NotImplementedError
 
 class TraceService:
     def __init__(self,provider:BlockchainProvider):

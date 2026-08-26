@@ -10,3 +10,5 @@ The trace engine supports bounded forward and backward traversal, time and asset
 ## Behavioral pattern intelligence
 
 Phase 5 adds an explicit `PatternService` and modular `PatternEngine` over bounded `TraceResult` data. Detector output is persisted as explainable, evidence-linked `PatternObservation` records through migration `005_fraud_patterns.sql`. The engine is descriptive only; future risk scoring remains a separate `RiskEngine` boundary.
+
+Phase 6 adds deterministic `RiskEngine` assessment over persisted patterns, source-backed attribution, and trace evidence. `RiskAssessment` records are immutable/versioned, factors require evidence references, deltas are explicit, and reviewable alert candidates do not imply fraud. See [risk-intelligence.md](docs/architecture/risk-intelligence.md).

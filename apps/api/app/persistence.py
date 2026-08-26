@@ -5,11 +5,12 @@ import asyncpg
 from .config import settings
 from .domain import *
 from .services import CaseRepository
+from .risk_persistence import RiskPersistenceMixin
 
 class DatabaseError(RuntimeError):
     """Database failures safe to translate at the HTTP boundary."""
 
-class PostgresCaseRepository(CaseRepository):
+class PostgresCaseRepository(RiskPersistenceMixin, CaseRepository):
     def __init__(self): self.pool: asyncpg.Pool | None = None
     async def connect(self):
         try:

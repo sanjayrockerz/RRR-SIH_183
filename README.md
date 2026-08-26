@@ -15,6 +15,7 @@ The platform keeps facts, attribution, analysis, and future recommendations sepa
 - NetworkX multi-edge transaction graph with paths, flows, metrics, and evidence references.
 - Source-backed entity and VASP attribution with confidence and provenance.
 - Explainable Phase 5 behavioral patterns: rapid hop, fan-in/out, peel chain, consolidation, burst activity, dormant activation, mixer/bridge interaction, and entity exposure.
+- Phase 6 deterministic investigative risk posture with configurable factors, risk bands, immutable assessment history, risk delta, investigative priority, watch-status readiness, and reviewable alert candidates.
 - Investigator workstation UI with case intake, graph inspection, evidence references, and pattern intelligence.
 - PostgreSQL source of truth with deterministic transaction, trace, and pattern deduplication.
 - Explicit capability states for historical, simulated, live, unsupported, and not-configured integrations.
@@ -30,7 +31,7 @@ The current release is historical Ethereum analysis through Alchemy. SAHYOG/NCRP
 3. Start the API: `python -m venv .venv && .\.venv\Scripts\Activate.ps1 && pip install -r apps/api/requirements.txt && uvicorn app.main:app --reload --app-dir apps/api`.
 4. Start the web app: `cd apps/investigator-web && npm install && npm run dev`.
 
-The API uses PostgreSQL as its source of truth. On a fresh database, apply migrations in order: `001_initial.sql`, `002_blockchain_data_fabric.sql`, `003_trace_runs.sql`, `004_entity_attribution.sql`, then `005_fraud_patterns.sql` from `infrastructure/postgres`. Attribution remains source-backed and does not establish ownership or criminal involvement.
+The API uses PostgreSQL as its source of truth. On a fresh database, apply migrations in order: `001_initial.sql`, `002_blockchain_data_fabric.sql`, `003_trace_runs.sql`, `004_entity_attribution.sql`, `005_fraud_patterns.sql`, then `006_risk_intelligence.sql` from `infrastructure/postgres`. Attribution remains source-backed and does not establish ownership or criminal involvement.
 
 ## API
 
@@ -43,6 +44,12 @@ The API uses PostgreSQL as its source of truth. On a fresh database, apply migra
 - `POST /api/v1/cases/{case_id}/patterns/analyze`
 - `GET /api/v1/cases/{case_id}/patterns`
 - `GET /api/v1/cases/{case_id}/patterns/summary`
+- `POST /api/v1/cases/{case_id}/risk/assess`
+- `GET /api/v1/cases/{case_id}/risk`
+- `GET /api/v1/cases/{case_id}/risk/history`
+- `GET /api/v1/cases/{case_id}/risk/delta`
+- `GET /api/v1/cases/{case_id}/risk/factors`
+- `GET /api/v1/cases/{case_id}/risk/alerts`
 - `GET /health`
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/development-status.md](docs/development-status.md) for scope and limitations.

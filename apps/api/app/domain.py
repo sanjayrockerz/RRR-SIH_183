@@ -208,3 +208,108 @@ class PatternSummary(BaseModel):
     critical_count: int = 0
     high_count: int = 0
     medium_count: int = 0
+
+class RiskBand(StrEnum): LOW="LOW"; GUARDED="GUARDED"; ELEVATED="ELEVATED"; HIGH="HIGH"; CRITICAL="CRITICAL"
+class InvestigativePriority(StrEnum): INFORMATIONAL="INFORMATIONAL"; REVIEW="REVIEW"; PRIORITY="PRIORITY"; URGENT="URGENT"; CRITICAL="CRITICAL"
+class WatchStatus(StrEnum): NOT_MONITORED="NOT_MONITORED"; MONITORED="MONITORED"; PAUSED="PAUSED"; CLOSED="CLOSED"
+class RiskAlertStatus(StrEnum): NEW="NEW"; ACKNOWLEDGED="ACKNOWLEDGED"; DISMISSED="DISMISSED"; ESCALATED="ESCALATED"
+
+class RiskSubject(BaseModel):
+    subject_id: str
+    case_id: str
+    chain: Chain
+    address: str
+    subject_type: str = "WALLET"
+
+class RiskFactorDefinition(BaseModel):
+    id: str
+    name: str
+    category: str
+    default_weight: float = Field(ge=0)
+    max_contribution: float = Field(ge=0)
+    enabled: bool = True
+    explanation_template: str
+    required_evidence_type: str = "TRANSACTION"
+
+class RiskBandThresholds(BaseModel):
+    guarded_min: float = Field(default=20, ge=0, le=100)
+    elevated_min: float = Field(default=40, ge=0, le=100)
+    high_min: float = Field(default=60, ge=0, le=100)
+    critical_min: float = Field(default=80, ge=0, le=100)
+
+class RiskScoringConfig(BaseModel):
+    version: str = "phase6-default-v1"
+    factors: list[RiskFactorDefinition] = []
+    thresholds: RiskBandThresholds = RiskBandThresholds()
+
+class RiskFactor(BaseModel):
+    factor_id: str
+    definition_id: str
+    name: str
+    category: str
+    contribution: float = Field(ge=0)
+    max_contribution: float = Field(ge=0)
+    explanation: str
+    confidence_level: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    pattern_ids: list[str] = []
+    entity_ids: list[str] = []
+    transaction_hashes: list[str] = []
+    evidence_ids: list[str] = []
+    metadata: dict = {}
+
+class RiskDelta(BaseModel):
+    previous_score: float | None = None
+    current_score: float
+    delta: float
+    new_factors: list[str] = []
+    removed_factors: list[str] = []
+    changed_factors: list[str] = []
+
+class RiskAssessment(BaseModel):
+    assessment_id: str
+    case_id: str
+    trace_id: str
+    subject: RiskSubject
+    version: int = Field(ge=1)
+    score: float = Field(ge=0, le=100)
+    band: RiskBand
+    priority: InvestigativePriority
+    priority_reason: str
+    watch_status: WatchStatus = WatchStatus.NOT_MONITORED
+    factors: list[RiskFactor] = []
+    delta: RiskDelta | None = None
+    calculation_version: str
+    calculated_at: datetime
+    evidence_ids: list[str] = []
+    pattern_ids: list[str] = []
+    entity_ids: list[str] = []
+    explanation: str
+    previous_assessment_id: str | None = None
+
+class RiskAssessRequest(BaseModel):
+    trace_id: str | None = None
+    subject_address: str | None = None
+    config: RiskScoringConfig = RiskScoringConfig()
+
+class RiskAlertCandidate(BaseModel):
+    candidate_id: str
+    case_id: str
+    subject_id: str
+    assessment_id: str
+    trigger: str
+    severity: RiskBand
+    risk_delta: float
+    pattern_ids: list[str] = []
+    evidence_ids: list[str] = []
+    created_at: datetime
+    status: RiskAlertStatus = RiskAlertStatus.NEW
+
+class AuditEvent(BaseModel):
+    event_id: str
+    case_id: str | None = None
+    action: str
+    resource_type: str
+    resource_id: str | None = None
+    actor_id: str | None = None
+    occurred_at: datetime
+    metadata: dict = {}
