@@ -32,6 +32,7 @@ from .primary_path import select_primary_path
 from .http_security import error_payload, request_id, validation_detail
 from .auth import AuthenticationError, JwtAuthenticator, auth_status
 from .synthetic_realtime import SyntheticBlockchainEventEngine
+from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
 from .event_bus import RealtimeEventBus
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -525,9 +526,11 @@ async def case_attributions(case_id: str):
 async def case_primary_path(case_id: str):
     case = await get_case(case_id)
     if not case.latest_trace:
-        return {"status": "UNATTRIBUTED", "root_address": next((item.address for item in case.wallets), ""), "node_ids": [], "transaction_hashes": [], "hops": 0, "terminal_address": None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No persisted trace is available.", "evidence_ids": [], "attribution_records": []}
+        return {"status": "UNATTRIBUTED", "root_address": next((item.address for item in case.wallets), ""), "node_ids": [], "transaction_hashes": [], "edge_ids": [], "hops": 0, "transaction_count": 0, "total_transferred_value": "UNKNOWN", "path_duration_seconds": None, "terminal_address": None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No persisted trace is available.", "evidence_ids": [], "attribution_records": []}
     try:
         entities, sources, records = await repo.attribution_catalog()
+        if is_synthetic_trace(case.latest_trace):
+            entities, sources, records = merge_synthetic_attribution(entities, sources, records)
         return select_primary_path(case.latest_trace, entities, sources, records)
     except DatabaseError as exc:
         return database_failure(exc)
@@ -917,6 +920,8 @@ async def _trace_for_patterns(case_id: str, trace_id: str | None):
 async def _case_attributions(trace: TraceResult):
     try:
         entities,sources,records=await repo.attribution_catalog()
+        if is_synthetic_trace(trace):
+            entities,sources,records=merge_synthetic_attribution(entities,sources,records)
         return NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
     except Exception as exc:
         logging.getLogger("crypto_fraud_intelligence").warning(

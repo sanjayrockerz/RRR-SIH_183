@@ -28,7 +28,10 @@ class ReportService:
         cross_links = await self.repository.cross_chain_links(case_id) if hasattr(self.repository, "cross_chain_links") else []
         
         from .attribution import AttributionEngine, NearestEntityResolver
+        from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
         entities, sources, records = await self.repository.attribution_catalog()
+        if is_synthetic_trace(trace):
+            entities, sources, records = merge_synthetic_attribution(entities, sources, records)
         nearest = NearestEntityResolver(AttributionEngine(entities, sources, records)).resolve(trace) if trace else []
 
         report = self._build(case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links)

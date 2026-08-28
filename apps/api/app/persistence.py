@@ -369,7 +369,7 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                 tx_rows=await conn.fetch("SELECT t.chain,t.tx_hash FROM transactions t JOIN case_transactions ct ON ct.transaction_id=t.transaction_id WHERE ct.case_id=$1 ORDER BY t.created_at",case_uuid)
                 trace_run=await conn.fetchrow("SELECT trace_id, mode, provider, acquisition FROM trace_runs WHERE case_id=$1 ORDER BY completed_at DESC LIMIT 1",case_uuid)
                 latest_trace_id = trace_run["trace_id"] if trace_run else None
-                edge_rows=await conn.fetch("SELECT ge.*,t.chain,t.tx_hash,t.block_number,t.timestamp,t.from_address,t.to_address,t.native_value,t.fee,t.raw_reference,tt.transfer_type,tt.contract_address,tt.token_id,tt.decimals,tt.raw_reference AS transfer_raw_reference FROM graph_edges ge JOIN transactions t ON t.transaction_id=ge.transaction_id LEFT JOIN transaction_transfers tt ON tt.transaction_id=ge.transaction_id AND tt.source_address=ge.source_wallet AND tt.destination_address=ge.destination_wallet AND tt.asset=ge.asset AND tt.amount=ge.amount WHERE ge.case_id=$1 AND ($2::uuid IS NULL OR ge.trace_id=$2 OR ge.trace_id IS NULL) ORDER BY ge.created_at",case_uuid,latest_trace_id)
+                edge_rows=await conn.fetch("SELECT ge.*,t.chain,t.tx_hash,t.block_number,t.timestamp,t.from_address,t.to_address,t.native_value,t.fee,t.provider,t.raw_reference,tt.transfer_type,tt.contract_address,tt.token_id,tt.decimals,tt.raw_reference AS transfer_raw_reference FROM graph_edges ge JOIN transactions t ON t.transaction_id=ge.transaction_id LEFT JOIN transaction_transfers tt ON tt.transaction_id=ge.transaction_id AND tt.source_address=ge.source_wallet AND tt.destination_address=ge.destination_wallet AND tt.asset=ge.asset AND tt.amount=ge.amount WHERE ge.case_id=$1 AND ($2::uuid IS NULL OR ge.trace_id=$2 OR ge.trace_id IS NULL) ORDER BY ge.created_at",case_uuid,latest_trace_id)
                 evidence_rows=await conn.fetch("SELECT * FROM evidence WHERE case_id=$1 ORDER BY created_at",case_uuid)
             latest_trace=self._trace_from_rows(
                 str(case_uuid), wallet_rows, edge_rows, evidence_rows,
@@ -460,7 +460,7 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             raw=row["raw_reference"] or {}; raw=json.loads(raw) if isinstance(raw,str) else raw
             transfer_raw=row["transfer_raw_reference"] or raw
             transfer_raw=json.loads(transfer_raw) if isinstance(transfer_raw,str) else transfer_raw
-            transfer=Transfer(tx_hash=row["tx_hash"],chain=row["chain"],block_number=row["block_number"],timestamp=row["timestamp"],source=row["from_address"],destination=row["to_address"],asset=row["asset"],amount=row["amount"],value_native=float(row["native_value"]) if row["native_value"] is not None else None,provider=raw.get("provider","PostgreSQL"),transfer_type=row["transfer_type"] or "native",contract_address=row["contract_address"] or None,token_id=row["token_id"] or None,decimals=row["decimals"],raw_reference=transfer_raw)
+            transfer=Transfer(tx_hash=row["tx_hash"],chain=row["chain"],block_number=row["block_number"],timestamp=row["timestamp"],source=row["from_address"],destination=row["to_address"],asset=row["asset"],amount=row["amount"],value_native=float(row["native_value"]) if row["native_value"] is not None else None,provider=row["provider"] or raw.get("provider","PostgreSQL"),transfer_type=row["transfer_type"] or "native",contract_address=row["contract_address"] or None,token_id=row["token_id"] or None,decimals=row["decimals"],fee=str(row["fee"]) if row["fee"] is not None else None,raw_reference=transfer_raw)
             edges.append(GraphEdge(edge_id=f"{row['tx_hash']}:{row['source_wallet']}:{row['destination_wallet']}",source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer,hop=row["hop"]))
         evidence=[Evidence(evidence_id=str(r["evidence_id"]),case_id=case_id,type=r["evidence_type"],chain=r["chain"],tx_hash=r["tx_hash"],source=r["source"],captured_at=r["captured_at"],metadata=(json.loads(r["metadata"]) if isinstance(r["metadata"],str) else (r["metadata"] or {})),content_hash=r.get("content_hash"),integrity_status=r.get("integrity_status") or "UNVERIFIED") for r in evidence_rows]
         root=next(iter(nodes),next((r["address"] for r in wallet_rows),""))
@@ -494,56 +494,12 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
         sources=[AttributionSource(source_id=str(r["source_id"]),name=r["name"],source_type=r["source_type"],publisher=r["publisher"],reference=r["reference"],reliability_level=r["reliability_level"],description=r["description"],dataset_version=r.get("dataset_version")) for r in source_rows]
         records=[AddressAttribution(attribution_id=str(r["attribution_id"]),chain=r["chain"],address=r["address"],entity_id=str(r["entity_id"]),role=r["role"],confidence=r["confidence"],source_id=str(r["source_id"]),source_reference=r["source_reference"],evidence_id=str(r["evidence_id"]) if r["evidence_id"] else None,first_seen=r["first_seen"],last_verified=r["last_verified"],metadata=self._json_dict(r["metadata"])) for r in attribution_rows]
 
-        # In DEVELOPMENT_FIXTURE mode, dynamically append attributions for custom traced wallets
+        # In development mode, merge only the static, source-labelled synthetic
+        # registry. Never derive an attribution from a wallet address.
         from .config import settings
         if settings.blockchain_data_mode.upper() == "DEVELOPMENT_FIXTURE":
-            import hashlib
-            def local_derive(base_addr: str, salt: str) -> str:
-                h = hashlib.md5((base_addr.lower() + salt).encode('utf-8')).hexdigest()
-                return "0x" + h + "0" * (40 - len(h))
-            
-            mock_mixer_id = "00000000-0000-0000-0000-000000000001"
-            mock_bridge_id = "00000000-0000-0000-0000-000000000002"
-            mock_vasp_id = "00000000-0000-0000-0000-000000000003"
-            
-            if not any(e.entity_id == mock_mixer_id for e in entities):
-                entities.append(Entity(entity_id=mock_mixer_id, name="Tornado Cash Mixer", entity_type="MIXER", legal_name="Tornado Cash", jurisdiction="UNKNOWN", website="tornado.cash", metadata={}))
-            if not any(e.entity_id == mock_bridge_id for e in entities):
-                entities.append(Entity(entity_id=mock_bridge_id, name="Hop Protocol Bridge", entity_type="BRIDGE", legal_name="Hop Protocol", jurisdiction="UNKNOWN", website="hop.exchange", metadata={}))
-            if not any(e.entity_id == mock_vasp_id for e in entities):
-                entities.append(Entity(entity_id=mock_vasp_id, name="Binance Exchange", entity_type="VASP", legal_name="Binance Inc.", jurisdiction="CAYMAN", website="binance.com", metadata={}))
-                
-            mock_source_id = "00000000-0000-0000-0000-000000000009"
-            if not any(s.source_id == mock_source_id for s in sources):
-                sources.append(AttributionSource(source_id=mock_source_id, name="RRR Threat Intelligence", source_type="COMMERCIAL", publisher="RRR Engine", reference="RRR-TI-01", reliability_level="HIGH", description="Simulated attributions for trace testing"))
-
-            for w_row in wallet_rows:
-                base = w_row["address"].lower()
-                mixer_addr = local_derive(base, "mixer")
-                bridge_addr = local_derive(base, "bridge")
-                vasp_addr = local_derive(base, "vasp")
-                
-                records.append(AddressAttribution(
-                    attribution_id=str(uuid4()), chain=Chain.ETHEREUM, address=mixer_addr,
-                    entity_id=mock_mixer_id, role="MIXER_CONTRACT", confidence=ConfidenceLevel.CONFIRMED,
-                    source_id=mock_source_id, source_reference="RRR-TI-01", evidence_id=None,
-                    first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                    last_verified=datetime(2026, 1, 1, tzinfo=timezone.utc), metadata={}
-                ))
-                records.append(AddressAttribution(
-                    attribution_id=str(uuid4()), chain=Chain.ETHEREUM, address=bridge_addr,
-                    entity_id=mock_bridge_id, role="BRIDGE_DEPOSIT", confidence=ConfidenceLevel.HIGH,
-                    source_id=mock_source_id, source_reference="RRR-TI-01", evidence_id=None,
-                    first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                    last_verified=datetime(2026, 1, 1, tzinfo=timezone.utc), metadata={}
-                ))
-                records.append(AddressAttribution(
-                    attribution_id=str(uuid4()), chain=Chain.ETHEREUM, address=vasp_addr,
-                    entity_id=mock_vasp_id, role="DEPOSIT_ADDRESS", confidence=ConfidenceLevel.HIGH,
-                    source_id=mock_source_id, source_reference="RRR-TI-01", evidence_id=None,
-                    first_seen=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                    last_verified=datetime(2026, 1, 1, tzinfo=timezone.utc), metadata={}
-                ))
+            from .synthetic_attribution import merge
+            entities, sources, records = merge(entities, sources, records)
 
         return entities,sources,records
 

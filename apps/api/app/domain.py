@@ -237,7 +237,7 @@ class Transfer(BaseModel):
     tx_hash: str; chain: Chain; block_number: int | None = None; timestamp: datetime | None = None
     source: str; destination: str; asset: str; amount: str; value_native: float | None = None; provider: str
     transfer_type: str = "native"; contract_address: str | None = None; token_id: str | None = None
-    decimals: int | None = None; raw_reference: dict = {}
+    decimals: int | None = None; fee: str | None = None; raw_reference: dict = {}
 
 class TransactionDetails(BaseModel):
     tx_hash: str; chain: Chain; block_number: int | None = None; timestamp: datetime | None = None

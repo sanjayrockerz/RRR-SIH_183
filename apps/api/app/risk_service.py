@@ -5,6 +5,7 @@ from uuid import uuid4
 from .attribution import AttributionEngine, NearestEntityResolver
 from .domain import *
 from .risk_engine import RiskEngine
+from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
 
 logger=logging.getLogger("crypto_fraud_intelligence")
 
@@ -25,11 +26,13 @@ class RiskService:
         except AttributeError:
             pass
         entities,sources,records=await self.repository.attribution_catalog()
+        if is_synthetic_trace(trace):
+            entities,sources,records=merge_synthetic_attribution(entities, sources, records)
         attributions=NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
         address=(request.subject_address or trace.root_address).lower()
         subject=RiskSubject(subject_id=address,case_id=case_id,chain=trace.nodes[0].chain if trace.nodes else Chain.ETHEREUM,address=address)
         previous=await self.repository.latest_risk(case_id,address)
-        assessment=self.engine.assess(trace,patterns,[item for item in attributions if item.address.lower()==address or item.address.lower() in {n.address.lower() for n in trace.nodes}],subject,request.config,previous,datetime.now(timezone.utc))
+        assessment=self.engine.assess(trace,patterns,[item for item in attributions if item.address.lower()==address or item.address.lower() in {n.address.lower() for n in trace.nodes}],subject,request.config,previous,datetime.now(timezone.utc),case_fraud_type=getattr(case,"fraud_type",""))
         alerts=[]
         if assessment.delta and assessment.delta.delta>0 and (assessment.delta.new_factors or assessment.delta.changed_factors or (previous and previous.band!=assessment.band)):
             alerts=[RiskAlertCandidate(candidate_id=str(uuid4()),case_id=case_id,subject_id=address,assessment_id=assessment.assessment_id,trigger="NEW INVESTIGATIVE SIGNAL: risk posture changed from persisted evidence",severity=assessment.band,risk_delta=assessment.delta.delta,pattern_ids=assessment.pattern_ids,evidence_ids=assessment.evidence_ids,created_at=assessment.calculated_at)]

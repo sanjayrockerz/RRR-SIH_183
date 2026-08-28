@@ -7,6 +7,7 @@ import json
 from .domain import *
 from .realtime import AlchemyWebhookNormalizer, RealtimeProvider
 from .config import settings
+from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
 import logging
 
 
@@ -165,6 +166,8 @@ class RealtimeService:
     async def _case_attributions(self, trace):
         from .attribution import AttributionEngine, NearestEntityResolver
         entities, sources, records = await self.repository.attribution_catalog()
+        if is_synthetic_trace(trace):
+            entities, sources, records = merge_synthetic_attribution(entities, sources, records)
         return NearestEntityResolver(AttributionEngine(entities, sources, records)).resolve(trace)
 
     def capabilities(self):

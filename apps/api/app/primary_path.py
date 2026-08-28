@@ -1,6 +1,8 @@
 """Selection of the one defensible investigative fund-flow path."""
 
 from collections import deque
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from .attribution import AttributionEngine
 from .domain import AttributionRole, ConfidenceLevel, EntityType, GraphEdge, TraceResult
 
@@ -21,12 +23,23 @@ def _paths_from_root(trace: TraceResult):
         source = _key(edge.transfer.chain, source_address)
         target = _key(edge.transfer.chain, target_address)
         adjacency.setdefault(source, []).append((target, edge))
+    for edges in adjacency.values():
+        # Persisted row order must never decide the investigative path.
+        edges.sort(key=lambda item: (
+            item[1].transfer.timestamp or datetime.min.replace(tzinfo=timezone.utc),
+            item[1].transaction_hash.lower(),
+            item[0],
+        ))
     queue = deque([(root, [root], [])])
     results = []
     while queue:
         current, nodes, edges = queue.popleft()
         results.append((nodes, edges))
+        last_timestamp = edges[-1].transfer.timestamp if edges else None
         for target, edge in adjacency.get(current, []):
+            edge_timestamp = edge.transfer.timestamp
+            if last_timestamp and edge_timestamp and edge_timestamp < last_timestamp:
+                continue
             if target not in nodes:
                 queue.append((target, nodes + [target], edges + [edge]))
     return results
@@ -64,6 +77,8 @@ def select_primary_path(trace: TraceResult, entities, sources, records) -> dict:
         return {
             "status": "ATTRIBUTED", "root_address": trace.root_address, "node_ids": [node_by_key[item].address for item in path_nodes if item in node_by_key],
             "transaction_hashes": [edge.transaction_hash for edge in path_edges], "hops": hops,
+            "edge_ids": [edge.edge_id for edge in path_edges],
+            **_path_measurements(path_edges),
             "terminal_address": node.address, "terminal_entity_id": candidate.entity.entity_id, "terminal_entity_name": candidate.entity.name,
             "terminal_entity_type": candidate.entity.entity_type, "terminal_role": role, "attribution": candidate.confidence,
             "why": "Nearest attributable VASP or exchange receiving the traced fund flow; directed edge continuity is preserved and traversal stops at this endpoint.",
@@ -74,7 +89,26 @@ def select_primary_path(trace: TraceResult, entities, sources, records) -> dict:
     if not leaves:
         leaves = [(len(edges), -len({edge.evidence_id for edge in edges if edge.evidence_id}), nodes, edges) for nodes, edges in paths if edges]
     if not leaves:
-        return {"status": "UNATTRIBUTED", "root_address": trace.root_address, "node_ids": [trace.root_address], "transaction_hashes": [], "hops": 0, "terminal_address": None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No reliable VASP, exchange, or custodian attribution is available in the persisted intelligence catalog.", "evidence_ids": [], "attribution_records": []}
+        return {"status": "UNATTRIBUTED", "root_address": trace.root_address, "node_ids": [trace.root_address], "transaction_hashes": [], "edge_ids": [], "hops": 0, **_path_measurements([]), "terminal_address": None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No reliable VASP, exchange, or custodian attribution is available in the persisted intelligence catalog.", "evidence_ids": [], "attribution_records": []}
     _, _, nodes, edges = max(leaves, key=lambda item: (item[0], item[1]))
     addresses = [node_by_key[item].address for item in nodes if item in node_by_key]
-    return {"status": "UNATTRIBUTED", "root_address": trace.root_address, "node_ids": addresses, "transaction_hashes": [edge.transaction_hash for edge in edges], "hops": len(edges), "terminal_address": addresses[-1] if addresses else None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No reliable VASP, exchange, or custodian attribution is available; the endpoint is the terminal observed destination of this directed path.", "evidence_ids": sorted({edge.evidence_id for edge in edges if edge.evidence_id}), "attribution_records": []}
+    return {"status": "UNATTRIBUTED", "root_address": trace.root_address, "node_ids": addresses, "transaction_hashes": [edge.transaction_hash for edge in edges], "edge_ids": [edge.edge_id for edge in edges], "hops": len(edges), **_path_measurements(edges), "terminal_address": addresses[-1] if addresses else None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No reliable VASP, exchange, or custodian attribution is available; the endpoint is the terminal observed destination of this directed path.", "evidence_ids": sorted({edge.evidence_id for edge in edges if edge.evidence_id}), "attribution_records": []}
+
+
+def _path_measurements(edges: list[GraphEdge]) -> dict:
+    totals: dict[str, Decimal] = {}
+    timestamps = [edge.transfer.timestamp for edge in edges if edge.transfer.timestamp]
+    for edge in edges:
+        try:
+            totals[edge.transfer.asset] = totals.get(edge.transfer.asset, Decimal("0")) + Decimal(edge.transfer.amount)
+        except (InvalidOperation, ValueError):
+            totals.setdefault(edge.transfer.asset, Decimal("0"))
+    total_value = " + ".join(
+        f"{amount.normalize():f} {asset}" for asset, amount in sorted(totals.items())
+    ) or "UNKNOWN"
+    duration = (max(timestamps) - min(timestamps)).total_seconds() if len(timestamps) > 1 else None
+    return {
+        "transaction_count": len(edges),
+        "total_transferred_value": total_value,
+        "path_duration_seconds": duration,
+    }

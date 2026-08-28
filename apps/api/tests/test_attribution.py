@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from app.attribution import AttributionEngine, NearestEntityResolver
 from app.primary_path import select_primary_path
+from app.synthetic_attribution import merge as merge_synthetic_attribution, DEMO_VASP_ADDRESS
 from app.domain import *
 
 ROOT="0x"+"a"*40; EXCHANGE="0x"+"b"*40; OTHER="0x"+"c"*40
@@ -46,3 +47,28 @@ def test_primary_path_does_not_fabricate_unknown_attribution():
     primary = select_primary_path(trace, entities, sources, records)
     assert primary["status"] == "UNATTRIBUTED"
     assert primary["terminal_entity_name"] == "UNKNOWN / UNATTRIBUTED DESTINATION"
+
+def test_primary_path_is_chronological_and_reports_measurements():
+    entities, sources, records = catalog()
+    first = edge("1", ROOT, OTHER).model_copy(update={"transfer": edge("1", ROOT, OTHER).transfer.model_copy(update={"amount": "0.7500", "timestamp": datetime(2025, 1, 1, tzinfo=timezone.utc)})})
+    terminal = edge("2", OTHER, EXCHANGE).model_copy(update={"transfer": edge("2", OTHER, EXCHANGE).transfer.model_copy(update={"amount": "1.160", "asset": "USDT", "timestamp": datetime(2025, 1, 2, tzinfo=timezone.utc)})})
+    late_reverse = edge("3", EXCHANGE, OTHER).model_copy(update={"transfer": edge("3", EXCHANGE, OTHER).transfer.model_copy(update={"timestamp": datetime(2024, 12, 1, tzinfo=timezone.utc)})})
+    trace = TraceResult(case_id="case", trace_id="trace", root_address=ROOT, mode=DataMode.HISTORICAL, provider="fixture", nodes=[GraphNode(id=x, address=x, depth=i) for i, x in enumerate([ROOT, OTHER, EXCHANGE])], edges=[late_reverse, terminal, first], signals=[], evidence=[])
+    primary = select_primary_path(trace, entities, sources, [item for item in records if item.entity_id == "entity-a"])
+    assert primary["transaction_hashes"] == [first.transaction_hash, terminal.transaction_hash]
+    assert primary["edge_ids"] == [first.edge_id, terminal.edge_id]
+    assert primary["transaction_count"] == 2
+    assert primary["total_transferred_value"] == "0.75 ETH + 1.16 USDT"
+    assert primary["path_duration_seconds"] == 86400.0
+
+def test_development_registry_resolves_synthetic_terminal_only():
+    entities, sources, records = merge_synthetic_attribution([], [], [])
+    e1 = edge("1", ROOT, OTHER)
+    e2 = edge("2", OTHER, DEMO_VASP_ADDRESS)
+    trace = TraceResult(case_id="case", trace_id="trace", root_address=ROOT, mode=DataMode.HISTORICAL, provider="DEVELOPMENT SYNTHETIC", nodes=[GraphNode(id=x, address=x, depth=i) for i, x in enumerate([ROOT, OTHER, DEMO_VASP_ADDRESS])], edges=[e1, e2], signals=[], evidence=[])
+    primary = select_primary_path(trace, entities, sources, records)
+    assert primary["status"] == "ATTRIBUTED"
+    assert primary["terminal_entity_name"] == "Demo Exchange"
+    assert primary["terminal_entity_type"] == "VASP"
+    assert primary["attribution"] == "HIGH"
+    assert primary["terminal_address"] == DEMO_VASP_ADDRESS
