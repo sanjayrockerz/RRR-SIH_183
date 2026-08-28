@@ -1,0 +1,26 @@
+.graph-viewport{min-height:620px;padding:18px 20px;background:radial-gradient(circle at 50% 45%,rgba(27,92,124,.18),transparent 60%),#071522}
+.graph-viewport svg{min-width:900px;min-height:620px;overflow:visible}
+.graph-node{color:#49c7b8}
+.graph-node.root{color:#56a8ff}
+.graph-node.contract{color:#bb91ff}
+.graph-node.risk-node{color:#ffbd58}
+.graph-node circle{fill:#092435;stroke:currentColor;stroke-width:3}
+.graph-node .node-core{fill:#0d3344;stroke:#a2eff0;stroke-width:2}
+.graph-node.root circle{fill:#0b2a4d;stroke:#56a8ff}
+.graph-node.root .node-core{fill:#164d7c;stroke:#b8ddff}
+.graph-node.contract circle{fill:#241641;stroke:#bb91ff}
+.graph-node.contract .node-core{fill:#40236b;stroke:#e0caff}
+.graph-node.risk-node circle{fill:#39270c;stroke:#ffbd58}
+.graph-node.risk-node .node-core{fill:#6b4712;stroke:#ffe0a0}
+.graph-node .node-type{font-size:10px;letter-spacing:.04em;fill:#f2fbff}
+.graph-node .node-label{font-size:12px;font-weight:700;fill:#ecf8fb;paint-order:stroke;stroke:#071522;stroke-width:4px;stroke-linejoin:round}
+.graph-node .node-meta{font-size:9px;fill:#9bc2d1}
+.graph-edge line{stroke:#62aabd;stroke-width:2.5;opacity:.88}
+.graph-edge.token-edge line{stroke:#bb91ff;stroke-dasharray:7 4}
+.graph-edge.risk-bearing line{stroke:#ffbd58;stroke-width:4}
+.graph-edge rect{fill:#071c2c;stroke:#3b6c7d;stroke-width:1.5}
+.graph-edge.token-edge rect{stroke:#8062ae}
+.graph-edge.risk-bearing rect{stroke:#b9812b;background:#261b0a}
+.graph-edge text{font-size:11px;font-weight:700;fill:#e7f7fb}
+.graph-surface-header .graph-legend-inline{color:#9bb9c6}
+@media(max-width:760px){.graph-viewport{padding:10px 4px;overflow-x:auto}.graph-viewport svg{min-width:900px}}

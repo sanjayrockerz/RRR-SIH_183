@@ -9,10 +9,10 @@ class GraphBuilder:
     def build(self, transfers: list[Transfer], root: str, depths: dict[str, int] | None = None):
         graph=nx.MultiDiGraph(); depths=depths or {}
         for transfer in transfers:
-            source=transfer.source.lower(); target=transfer.destination.lower()
+            source=normalize_address(transfer.chain,transfer.source); target=normalize_address(transfer.chain,transfer.destination)
             if not source or not target: continue
             for address in (source,target):
-                graph.add_node(address, address=address, chain=transfer.chain, node_type="CONTRACT" if address == transfer.contract_address else "WALLET")
+                graph.add_node(address, address=address, chain=transfer.chain, node_type="CONTRACT" if transfer.contract_address and address == normalize_address(transfer.chain,transfer.contract_address) else "WALLET")
             edge_id=str(uuid4()); graph.add_edge(source,target,key=edge_id,edge_id=edge_id,transfer=transfer)
         nodes=[]
         for address,data in graph.nodes(data=True):

@@ -12,7 +12,7 @@ pytestmark = pytest.mark.skipif(not os.getenv("RUN_POSTGRES_TESTS"), reason="Set
 async def test_persistent_core_survives_reconnect():
     database_url=os.getenv("DATABASE_URL","postgresql://postgres:postgres@localhost:5432/crypto_fraud_intelligence")
     conn=await asyncpg.connect(database_url)
-    migrations=Path(__file__).parents[2] / "infrastructure/postgres"
+    migrations=Path(__file__).parents[3] / "infrastructure/postgres"
     await conn.execute((migrations / "001_initial.sql").read_text())
     await conn.execute((migrations / "002_blockchain_data_fabric.sql").read_text())
     await conn.execute((migrations / "003_trace_runs.sql").read_text())
@@ -20,7 +20,10 @@ async def test_persistent_core_survives_reconnect():
     await conn.execute((migrations / "005_fraud_patterns.sql").read_text())
     await conn.execute((migrations / "006_risk_intelligence.sql").read_text())
     await conn.execute((migrations / "007_realtime_retracing.sql").read_text())
-    await conn.execute((migrations / "008_cross_chain_intelligence.sql").read_text())
+    for migration in sorted(migrations.glob("0*.sql")):
+        if migration.name in {"001_initial.sql", "002_blockchain_data_fabric.sql", "003_trace_runs.sql", "004_entity_attribution.sql", "005_fraud_patterns.sql", "006_risk_intelligence.sql", "007_realtime_retracing.sql", "008_cross_chain_intelligence.sql"}:
+            continue
+        await conn.execute(migration.read_text())
     repo=PostgresCaseRepository(); repo.pool=await asyncpg.create_pool(database_url)
     try:
         first=await repo.create(CaseCreate(title="Persistence one",fraud_type="Phishing"))

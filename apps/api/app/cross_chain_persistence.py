@@ -16,8 +16,8 @@ class CrossChainPersistenceMixin:
                 async with conn.transaction():
                     case_uuid=UUID(case_id)
                     if not await conn.fetchval("SELECT 1 FROM cases WHERE case_id=$1",case_uuid): return None
-                    await conn.execute("INSERT INTO chain_addresses(chain,address,created_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",transfer.chain,transfer.source.lower(),now)
-                    await conn.execute("INSERT INTO chain_addresses(chain,address,created_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",transfer.chain,transfer.destination.lower(),now)
+                    await conn.execute("INSERT INTO chain_addresses(chain,address,created_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",transfer.chain,normalize_address(transfer.chain,transfer.source),now)
+                    await conn.execute("INSERT INTO chain_addresses(chain,address,created_at) VALUES($1,$2,$3) ON CONFLICT DO NOTHING",transfer.chain,normalize_address(transfer.chain,transfer.destination),now)
                     tx_id=await conn.fetchval("SELECT transaction_id FROM transactions WHERE chain=$1 AND tx_hash=$2",transfer.chain,transfer.tx_hash.lower())
                     if not tx_id:
                         tx_id=await conn.fetchval("INSERT INTO transactions(transaction_id,chain,tx_hash,block_number,timestamp,status,from_address,to_address,native_value,raw_reference,created_at,provider,provider_retrieved_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING transaction_id",uuid4(),transfer.chain,transfer.tx_hash.lower(),transfer.block_number,transfer.timestamp,"OBSERVED",transfer.source,transfer.destination,transfer.value_native,json.dumps(transfer.raw_reference),now,transfer.provider,now)

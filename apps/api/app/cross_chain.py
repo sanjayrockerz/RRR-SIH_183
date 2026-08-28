@@ -2,7 +2,7 @@
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 from hashlib import sha256
-from uuid import uuid4
+from uuid import uuid4, uuid5, NAMESPACE_URL
 import networkx as nx
 
 from .domain import *
@@ -26,7 +26,7 @@ class ChainRegistry:
         try: return self._items[chain]
         except KeyError as exc: raise ValueError(f"Unsupported chain: {chain}") from exc
     def list(self): return list(self._items.values())
-    def node_id(self, chain: Chain, address: str): return f"{chain.value}:{address.lower()}"
+    def node_id(self, chain: Chain, address: str): return f"{chain.value}:{normalize_address(chain,address)}"
 
 
 class BridgeRegistry:
@@ -35,14 +35,14 @@ class BridgeRegistry:
         self._contract_index={}
         for definition in self._definitions.values():
             for chain, contracts in definition.deposit_contracts.items():
-                for contract in contracts: self._contract_index[(chain,contract.lower(),"BRIDGE_DEPOSIT")]=definition
+                for contract in contracts: self._contract_index[(chain,normalize_address(chain,contract),"BRIDGE_DEPOSIT")]=definition
             for chain, contracts in definition.withdrawal_contracts.items():
-                for contract in contracts: self._contract_index[(chain,contract.lower(),"BRIDGE_WITHDRAWAL")]=definition
+                for contract in contracts: self._contract_index[(chain,normalize_address(chain,contract),"BRIDGE_WITHDRAWAL")]=definition
             for chain, contracts in definition.router_contracts.items():
-                for contract in contracts: self._contract_index[(chain,contract.lower(),"CONTRACT_INTERACTION")]=definition
+                for contract in contracts: self._contract_index[(chain,normalize_address(chain,contract),"CONTRACT_INTERACTION")]=definition
     def list(self): return list(self._definitions.values())
     def match(self, chain: Chain, address: str, interaction_type: str):
-        return self._contract_index.get((chain,address.lower(),interaction_type))
+        return self._contract_index.get((chain,normalize_address(chain,address),interaction_type))
 
 
 class BridgeDetectionEngine:
@@ -68,7 +68,10 @@ class CrossChainCorrelationEngine:
     def correlate(self, interactions: list[BridgeInteraction], destination_transfers: list[Transfer], definition: BridgeDefinition | None = None):
         links=[]
         for interaction in interactions:
-            candidates=[t for t in destination_transfers if interaction.destination_chain in (None,t.chain) and (not interaction.timestamp or not t.timestamp or abs((t.timestamp-interaction.timestamp).total_seconds()) <= 86400)]
+            # A missing destination chain is an evidence gap, not a wildcard.
+            # Do not correlate an observation to an arbitrary network merely
+            # because timing or asset symbols happen to be similar.
+            candidates=[t for t in destination_transfers if interaction.destination_chain is not None and interaction.destination_chain == t.chain and (not interaction.timestamp or not t.timestamp or abs((t.timestamp-interaction.timestamp).total_seconds()) <= 86400)]
             if not candidates:
                 links.append(self._unresolved(interaction)); continue
             best=max(candidates,key=lambda t:self._score(interaction,t))
@@ -76,12 +79,13 @@ class CrossChainCorrelationEngine:
             level="EXACT" if score>=0.95 else "STRONG" if score>=0.55 else "PROBABLE" if score>=0.35 else "POSSIBLE" if score>0 else "UNRESOLVED"
             band=ConfidenceLevel.CONFIRMED if level=="EXACT" else ConfidenceLevel.HIGH if level=="STRONG" else ConfidenceLevel.MEDIUM if level=="PROBABLE" else ConfidenceLevel.LOW if level=="POSSIBLE" else ConfidenceLevel.UNKNOWN
             destination=best.destination
-            links.append(CrossChainLink(link_id=str(uuid4()),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=ChainAddress(chain=best.chain,address=destination),source_transaction_hash=interaction.transaction_hash,destination_transaction_hash=best.tx_hash,bridge_id=interaction.bridge_id,correlation_id=sha256(f"{interaction.transaction_hash}|{best.tx_hash}|{interaction.bridge_id}".encode()).hexdigest(),correlation_level=level,confidence_score=score,confidence_band=band,evidence_count=len(set(interaction.evidence_ids)),correlation_reasons=reasons,evidence_ids=list(dict.fromkeys(interaction.evidence_ids)),provenance_source="CrossChainCorrelationEngine",explanation="Inferred cross-chain relationship; " + ("; ".join(reasons) if reasons else "no qualifying correlation signal"),created_at=datetime.now(timezone.utc)))
+            correlation_id=sha256(f"{interaction.transaction_hash}|{best.tx_hash}|{interaction.bridge_id}".encode()).hexdigest()
+            links.append(CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=ChainAddress(chain=best.chain,address=destination),source_transaction_hash=interaction.transaction_hash,destination_transaction_hash=best.tx_hash,bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level=level,confidence_score=score,confidence_band=band,evidence_count=len(set(interaction.evidence_ids)),correlation_reasons=reasons,evidence_ids=list(dict.fromkeys(interaction.evidence_ids)),provenance_source="CrossChainCorrelationEngine",explanation="Inferred cross-chain relationship; " + ("; ".join(reasons) if reasons else "no qualifying correlation signal"),created_at=datetime.now(timezone.utc)))
         return links
     def _score(self, interaction, transfer, with_reasons=False):
         score=0.0; reasons=[]; raw=transfer.raw_reference or {}
         if interaction.message_id and raw.get("message_id") == interaction.message_id: score+=0.7; reasons.append("matching bridge message ID")
-        if interaction.recipient and interaction.recipient.lower() in {transfer.source.lower(),transfer.destination.lower()}: score+=0.25; reasons.append("matching destination address")
+        if interaction.recipient and normalize_address(transfer.chain,interaction.recipient) in {normalize_address(transfer.chain,transfer.source),normalize_address(transfer.chain,transfer.destination)}: score+=0.25; reasons.append("matching destination address")
         if interaction.asset.lower()==transfer.asset.lower(): score+=0.1; reasons.append("matching asset symbol; contract mapping still requires verification")
         if interaction.timestamp and transfer.timestamp:
             elapsed=abs((transfer.timestamp-interaction.timestamp).total_seconds())
@@ -91,7 +95,8 @@ class CrossChainCorrelationEngine:
         score=min(score,1.0)
         return (score,reasons) if with_reasons else score
     def _unresolved(self, interaction):
-        return CrossChainLink(link_id=str(uuid4()),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=None,source_transaction_hash=interaction.transaction_hash,destination_transaction_hash="",bridge_id=interaction.bridge_id,correlation_id=sha256(interaction.transaction_hash.encode()).hexdigest(),correlation_level="UNRESOLVED",confidence_score=0,confidence_band=ConfidenceLevel.UNKNOWN,evidence_count=len(interaction.evidence_ids),correlation_reasons=[],evidence_ids=interaction.evidence_ids,provenance_source="CrossChainCorrelationEngine",explanation="Bridge interaction observed, but no destination-chain transaction was correlated; no destination address is asserted.",created_at=datetime.now(timezone.utc))
+        correlation_id=sha256(f"{interaction.transaction_hash}|unresolved|{interaction.bridge_id}".encode()).hexdigest()
+        return CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=None,source_transaction_hash=interaction.transaction_hash,destination_transaction_hash="",bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level="UNRESOLVED",confidence_score=0,confidence_band=ConfidenceLevel.UNKNOWN,evidence_count=len(interaction.evidence_ids),correlation_reasons=[],evidence_ids=interaction.evidence_ids,provenance_source="CrossChainCorrelationEngine",explanation="Bridge interaction observed, but no destination-chain transaction was correlated; no destination address is asserted.",created_at=datetime.now(timezone.utc))
 
 
 class CrossChainGraphBuilder:

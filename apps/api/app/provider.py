@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from datetime import datetime, timezone
 from typing import Any
+import asyncio
 import httpx
 from .config import settings
 from .data_fabric import BlockchainDataFabric
@@ -35,17 +36,35 @@ class AlchemyEthereumProvider(BlockchainProvider):
             ProviderCapability(name="realtime_alerts", status=CapabilityStatus.SUPPORTED if (settings.alchemy_api_key and settings.alchemy_webhook_id and settings.alchemy_webhook_signing_key) else CapabilityStatus.NOT_CONFIGURED, mode=DataMode.WEBHOOK, note="Evidence-backed internal investigative alert candidates."),
         ]
 
+    async def health(self):
+        if not settings.alchemy_api_key:
+            return {"status": "NOT_CONFIGURED", "detail": "ALCHEMY_API_KEY is not configured"}
+        try:
+            result = await self._rpc("eth_blockNumber", [])
+            return {"status": "CONNECTED", "detail": "Alchemy RPC probe succeeded", "latest_block": result}
+        except ProviderError as exc:
+            return {"status": "DEGRADED", "detail": str(exc)}
+
     def _url(self):
         if not settings.alchemy_api_key:
             raise ProviderError("ALCHEMY_API_KEY is not configured")
         return f"https://{settings.alchemy_network}.g.alchemy.com/v2/{settings.alchemy_api_key}"
 
     async def _rpc(self, method: str, params: list[Any]) -> dict:
+        attempts=max(1,settings.provider_max_retries+1)
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                response = await client.post(self._url(), json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-                response.raise_for_status()
-                data = response.json()
+            async with httpx.AsyncClient(timeout=settings.provider_timeout_seconds) as client:
+                for attempt in range(attempts):
+                    try:
+                        response = await client.post(self._url(), json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+                        if response.status_code == 429 or response.status_code >= 500:
+                            if attempt+1 < attempts:
+                                await asyncio.sleep(min(2 ** attempt, 4)); continue
+                        response.raise_for_status(); data = response.json(); break
+                    except (httpx.TimeoutException, httpx.NetworkError):
+                        if attempt+1 >= attempts: raise
+                        await asyncio.sleep(min(2 ** attempt, 4))
+                else: raise ProviderError(f"Alchemy {method} request exhausted retries")
         except (httpx.HTTPError, ValueError) as exc:
             raise ProviderError(f"Alchemy {method} request failed") from exc
         if not isinstance(data, dict) or "error" in data:
@@ -170,16 +189,35 @@ class TronGridProvider(BlockchainProvider):
             ProviderCapability(name="webhook_events",status=CapabilityStatus.NOT_CONFIGURED,mode=DataMode.WEBHOOK,note="No Tron realtime adapter is enabled."),
         ]
 
+    async def health(self):
+        if not self.configured():
+            return {"status": "NOT_CONFIGURED", "detail": "TRONGRID_API_KEY is not configured"}
+        try:
+            await self._request("/wallet/getnowblock", {}, post=True)
+            return {"status": "CONNECTED", "detail": "TronGrid probe succeeded"}
+        except ProviderError as exc:
+            return {"status": "DEGRADED", "detail": str(exc)}
+
     def _url(self, path):
         if not self.configured(): raise ProviderError("TRONGRID_API_KEY is not configured")
         return settings.trongrid_base_url.rstrip("/")+path
 
     async def _request(self,path,params=None,post=False):
+        attempts=max(1,settings.provider_max_retries+1)
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
+            async with httpx.AsyncClient(timeout=settings.provider_timeout_seconds) as client:
                 headers={"TRON-PRO-API-KEY":settings.trongrid_api_key}
-                response=await (client.post(self._url(path),json=params or {},headers=headers) if post else client.get(self._url(path),params=params or {},headers=headers))
-                response.raise_for_status(); payload=response.json()
+                for attempt in range(attempts):
+                    try:
+                        response=await (client.post(self._url(path),json=params or {},headers=headers) if post else client.get(self._url(path),params=params or {},headers=headers))
+                        if response.status_code == 429 or response.status_code >= 500:
+                            if attempt+1 < attempts:
+                                await asyncio.sleep(min(2 ** attempt, 4)); continue
+                        response.raise_for_status(); payload=response.json(); break
+                    except (httpx.TimeoutException, httpx.NetworkError):
+                        if attempt+1 >= attempts: raise
+                        await asyncio.sleep(min(2 ** attempt, 4))
+                else: raise ProviderError(f"TronGrid request exhausted retries for {path}")
         except (httpx.HTTPError,ValueError) as exc: raise ProviderError(f"TronGrid request failed for {path}") from exc
         if not isinstance(payload,dict) or payload.get("success") is False: raise ProviderError(f"TronGrid returned an error for {path}")
         return payload

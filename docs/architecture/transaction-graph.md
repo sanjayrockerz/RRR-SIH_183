@@ -20,6 +20,8 @@ PostgreSQL remains authoritative. trace_runs records every synchronous run, its 
 
 The trace endpoint returns nodes, multi-edges, paths, flows, metrics, status, limits, and evidence. Trace listing, graph, path, and metrics endpoints expose persisted analysis. The investigator UI supports bounded trace submission, zoom controls, fit/reset, node selection, edge selection, and an evidence detail panel.
 
+The graph workspace uses a real SVG representation of the returned trace data rather than fixture nodes. It exposes observed-data and partial-trace states, asset filtering, deterministic zoom/reset controls, keyboard-selectable nodes and edges, and a right-hand inspector for chain, address, transaction, provider, block, and evidence references. Frontend identity handling uses `chain:address` internally so equal address strings on separate networks cannot collide; legacy single-chain payloads default to Ethereum for compatibility. Risk-linked styling is a derived overlay from a persisted assessment; it never changes the underlying observed graph. When no trace is loaded, the route presents an explicit empty state instead of inventing a graph.
+
 ## Scale assumptions
 
 This phase targets bounded investigation graphs, not chain-wide indexing. Limits prevent unbounded traversal. A persistent graph solution is intentionally deferred.

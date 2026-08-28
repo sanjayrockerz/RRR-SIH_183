@@ -7,3 +7,5 @@ networkx==3.4.2
 asyncpg==0.30.0
 pytest==8.3.4
 pytest-asyncio==0.25.3
+neo4j==5.28.1
+PyJWT[crypto]==2.10.1

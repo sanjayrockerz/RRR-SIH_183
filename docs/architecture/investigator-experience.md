@@ -10,6 +10,8 @@ The shell provides persistent navigation for the dashboard, investigations, wall
 
 `Dashboard → New investigation → manual intake → API case creation → wallet intake → historical trace → case overview → graph inspector`
 
+The Wallet Intelligence workspace provides a read-only lookup over persisted wallet identity and graph observations through `GET /api/v1/wallets/{chain}/{address}`. It reports observed transaction direction counts, assets, related case IDs, timestamps, and evidence counts; it does not infer ownership, current balance, or criminality.
+
 Case and trace data shown in the overview and graph inspector come from the existing FastAPI contracts. Graph nodes, edges, transaction hashes, timestamps, blocks, provider, and evidence references are displayed as observed blockchain flow.
 
 ## Capability states
@@ -23,7 +25,7 @@ SAHYOG/NCRP are represented as a connection boundary only. A future adapter shou
 
 ## Workspaces and states
 
-Dashboard, intake, case overview, and graph inspection are operational for the current backend. Wallet, entity, evidence, alert, and report routes are transparent capability surfaces until their corresponding list, aggregation, and detail APIs exist. Empty, error, disabled, and not-configured states are preferred over fabricated metrics or conclusions.
+Dashboard, intake, case overview, and graph inspection are operational for the current backend. The case registry can reopen a persisted case through `GET /api/v1/cases/{case_id}` and restore its latest persisted trace into the investigator context. Cases without a trace receive an explicit trace-unavailable state rather than an empty or fabricated graph. Wallet, entity, evidence, alert, and report routes are transparent capability surfaces until their corresponding list, aggregation, and detail APIs exist. Empty, error, disabled, and not-configured states are preferred over fabricated metrics or conclusions.
 
 ## Visual and interaction system
 

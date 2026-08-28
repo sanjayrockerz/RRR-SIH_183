@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 import json
 import asyncpg
@@ -9,10 +9,11 @@ class RealtimePersistenceMixin:
         from .persistence import DatabaseError
         try:
             async with self._require_pool().acquire() as conn:
-                await conn.execute("""INSERT INTO watch_targets(watch_id,case_id,chain,address,source,created_at,status,provider,subscription_id,expansion_policy,max_hops,max_new_nodes_per_event,max_new_edges_per_event,max_value,allowed_assets,error)
+                persisted_watch_id=await conn.fetchval("""INSERT INTO watch_targets(watch_id,case_id,chain,address,source,created_at,status,provider,subscription_id,expansion_policy,max_hops,max_new_nodes_per_event,max_new_edges_per_event,max_value,allowed_assets,error)
                 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-                ON CONFLICT(case_id,chain,address) DO UPDATE SET status=EXCLUDED.status,error=EXCLUDED.error""",UUID(watch.watch_id),UUID(watch.case_id),watch.chain,watch.address.lower(),watch.source,watch.created_at,watch.status,watch.provider,watch.subscription_id,watch.expansion_policy,watch.max_hops,watch.max_new_nodes_per_event,watch.max_new_edges_per_event,watch.max_value,json.dumps(watch.allowed_assets),watch.error)
-            return await self.get_watch(watch.case_id,watch.watch_id)
+                ON CONFLICT(case_id,chain,address) DO UPDATE SET status=EXCLUDED.status,source=EXCLUDED.source,provider=EXCLUDED.provider,error=EXCLUDED.error
+                RETURNING watch_id""",UUID(watch.watch_id),UUID(watch.case_id),watch.chain,watch.address.lower(),watch.source,watch.created_at,watch.status,watch.provider,watch.subscription_id,watch.expansion_policy,watch.max_hops,watch.max_new_nodes_per_event,watch.max_new_edges_per_event,watch.max_value,json.dumps(watch.allowed_assets),watch.error)
+            return await self.get_watch(watch.case_id,str(persisted_watch_id))
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Watch could not be persisted") from exc
 
     def _watch_from_row(self,row):
@@ -60,14 +61,19 @@ class RealtimePersistenceMixin:
                 duplicate=inserted is None
                 row=await conn.fetchrow("SELECT * FROM realtime_events WHERE event_id=$1",event.event_id)
             if duplicate:
-                event=self._event_from_row(row).model_copy(update={"processing_status":RealtimeProcessingStatus.DUPLICATE})
+                event=self._event_from_row(row)
+                # A retryable delivery may be submitted again by the provider;
+                # an applied or dead-lettered event must remain idempotent.
+                duplicate=event.processing_status not in {RealtimeProcessingStatus.RECEIVED, RealtimeProcessingStatus.RETRY_PENDING, RealtimeProcessingStatus.FAILED}
+                if duplicate:
+                    event=event.model_copy(update={"processing_status":RealtimeProcessingStatus.DUPLICATE})
             return event,duplicate
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime event could not be persisted") from exc
 
     def _event_from_row(self,row):
         raw=row["raw_provider_reference"] or {}
         if isinstance(raw,str): raw=json.loads(raw)
-        return RealtimeEvent(event_id=row["event_id"],provider=row["provider"],provider_event_id=row["provider_event_id"],chain=row["chain"],event_type=row["event_type"],received_at=row["received_at"],observed_at=row["observed_at"],block_number=row["block_number"],block_hash=row["block_hash"],transaction_hash=row["transaction_hash"],transfer_index=row["transfer_index"],from_address=row["from_address"],to_address=row["to_address"],asset=row["asset"],amount=row["amount"],contract_address=row["contract_address"],token_id=row["token_id"],raw_provider_reference=raw,processing_status=row["processing_status"],confirmation_state=row["confirmation_state"],removed=row["removed"],error=row["error"])
+        return RealtimeEvent(event_id=row["event_id"],provider=row["provider"],provider_event_id=row["provider_event_id"],chain=row["chain"],event_type=row["event_type"],received_at=row["received_at"],observed_at=row["observed_at"],block_number=row["block_number"],block_hash=row["block_hash"],transaction_hash=row["transaction_hash"],transfer_index=row["transfer_index"],from_address=row["from_address"],to_address=row["to_address"],asset=row["asset"],amount=row["amount"],contract_address=row["contract_address"],token_id=row["token_id"],raw_provider_reference=raw,processing_status=row["processing_status"],confirmation_state=row["confirmation_state"],removed=row["removed"],error=row["error"],attempt_count=row["attempt_count"],next_attempt_at=row["next_attempt_at"],dead_lettered_at=row["dead_lettered_at"])
 
     async def apply_realtime_event(self,event:RealtimeEvent,watch:WatchTarget):
         from .persistence import DatabaseError
@@ -114,6 +120,10 @@ class RealtimePersistenceMixin:
         async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM alerts WHERE case_id=$1 ORDER BY created_at DESC",UUID(case_id))
         return [Alert(alert_id=str(row["alert_id"]),case_id=str(row["case_id"]),subject_id=row["subject_id"],alert_type=row["alert_type"],title=row["title"],explanation=row["explanation"],severity=row["severity"],status=row["status"],risk_delta=float(row["risk_delta"]),pattern_ids=json.loads(row["pattern_ids"]) if isinstance(row["pattern_ids"],str) else (row["pattern_ids"] or []),evidence_ids=json.loads(row["evidence_ids"]) if isinstance(row["evidence_ids"],str) else (row["evidence_ids"] or []),created_at=row["created_at"]) for row in rows]
 
+    async def all_alerts(self):
+        async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM alerts ORDER BY created_at DESC")
+        return [Alert(alert_id=str(row["alert_id"]),case_id=str(row["case_id"]),subject_id=row["subject_id"],alert_type=row["alert_type"],title=row["title"],explanation=row["explanation"],severity=row["severity"],status=row["status"],risk_delta=float(row["risk_delta"]),pattern_ids=json.loads(row["pattern_ids"]) if isinstance(row["pattern_ids"],str) else (row["pattern_ids"] or []),evidence_ids=json.loads(row["evidence_ids"]) if isinstance(row["evidence_ids"],str) else (row["evidence_ids"] or []),created_at=row["created_at"]) for row in rows]
+
     async def append_timeline(self,event:TimelineEvent):
         async with self._require_pool().acquire() as conn:
             await conn.execute("INSERT INTO investigation_timeline(event_id,case_id,timestamp,event_type,summary,source,evidence_ids,metadata) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(event_id) DO NOTHING",UUID(event.event_id),UUID(event.case_id),event.timestamp,event.event_type,event.summary,event.source,json.dumps(event.evidence_ids),json.dumps(event.metadata))
@@ -127,7 +137,103 @@ class RealtimePersistenceMixin:
             inserted=await conn.fetchval("INSERT INTO alerts(alert_id,case_id,subject_id,alert_type,title,explanation,severity,status,risk_delta,pattern_ids,evidence_ids,fingerprint,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(fingerprint) DO NOTHING RETURNING alert_id",UUID(alert.alert_id),UUID(alert.case_id),alert.subject_id,alert.alert_type,alert.title,alert.explanation,alert.severity,alert.status,alert.risk_delta,json.dumps(alert.pattern_ids),json.dumps(alert.evidence_ids),fingerprint,alert.created_at)
             return alert if inserted else None
 
+    def _alert_from_row(self,row):
+        return Alert(alert_id=str(row["alert_id"]),case_id=str(row["case_id"]),subject_id=row["subject_id"],alert_type=row["alert_type"],title=row["title"],explanation=row["explanation"],severity=row["severity"],status=row["status"],risk_delta=float(row["risk_delta"]),pattern_ids=json.loads(row["pattern_ids"]) if isinstance(row["pattern_ids"],str) else (row["pattern_ids"] or []),evidence_ids=json.loads(row["evidence_ids"]) if isinstance(row["evidence_ids"],str) else (row["evidence_ids"] or []),created_at=row["created_at"])
+
+    async def get_alert(self,case_id: str,alert_id: str):
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn: row=await conn.fetchrow("SELECT * FROM alerts WHERE case_id=$1 AND alert_id=$2",UUID(case_id),UUID(alert_id))
+            return self._alert_from_row(row) if row else None
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Alert could not be retrieved") from exc
+
+    async def review_alert(self,case_id: str,alert_id: str,review: AlertReviewRequest):
+        from .persistence import DatabaseError
+        target={AlertReviewAction.ACKNOWLEDGE:AlertStatus.ACKNOWLEDGED,AlertReviewAction.DISMISS:AlertStatus.DISMISSED,AlertReviewAction.ESCALATE:AlertStatus.ESCALATED}[review.action]
+        now=datetime.now(timezone.utc)
+        allowed={AlertStatus.NEW:{AlertStatus.ACKNOWLEDGED,AlertStatus.DISMISSED,AlertStatus.ESCALATED},AlertStatus.ACKNOWLEDGED:{AlertStatus.DISMISSED,AlertStatus.ESCALATED},AlertStatus.ESCALATED:{AlertStatus.ACKNOWLEDGED,AlertStatus.DISMISSED},AlertStatus.DISMISSED:set()}
+        try:
+            async with self._require_pool().acquire() as conn:
+                async with conn.transaction():
+                    row=await conn.fetchrow("SELECT * FROM alerts WHERE case_id=$1 AND alert_id=$2 FOR UPDATE",UUID(case_id),UUID(alert_id))
+                    if not row: raise ValueError("Alert not found")
+                    current=AlertStatus(row["status"])
+                    if current==target: return self._alert_from_row(row)
+                    if target not in allowed[current]: raise ValueError(f"Cannot transition alert from {current} to {target}")
+                    await conn.execute("UPDATE alerts SET status=$3,updated_at=$4,reviewed_at=$4,reviewed_by=$5 WHERE case_id=$1 AND alert_id=$2",UUID(case_id),UUID(alert_id),target,now,review.actor_id)
+                    await conn.execute("INSERT INTO alert_reviews(review_id,alert_id,case_id,from_status,to_status,action,note,actor_id,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",uuid4(),UUID(alert_id),UUID(case_id),current,target,review.action,review.note,review.actor_id,now)
+                    row=await conn.fetchrow("SELECT * FROM alerts WHERE case_id=$1 AND alert_id=$2",UUID(case_id),UUID(alert_id))
+                    return self._alert_from_row(row)
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Alert review could not be persisted") from exc
+
+    async def alert_reviews(self,case_id: str,alert_id: str):
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM alert_reviews WHERE case_id=$1 AND alert_id=$2 ORDER BY created_at DESC",UUID(case_id),UUID(alert_id))
+            return [AlertReview(review_id=str(row["review_id"]),alert_id=str(row["alert_id"]),case_id=str(row["case_id"]),from_status=row["from_status"],to_status=row["to_status"],action=row["action"],note=row["note"],actor_id=row["actor_id"],created_at=row["created_at"]) for row in rows]
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Alert review history could not be retrieved") from exc
+
     async def get_realtime_event(self,event_id:str):
         async with self._require_pool().acquire() as conn:
             row=await conn.fetchrow("SELECT * FROM realtime_events WHERE event_id=$1",event_id)
         return self._event_from_row(row) if row else None
+
+    async def list_realtime_events(self,case_id:str,limit:int=50):
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn:
+                rows=await conn.fetch("SELECT DISTINCT ON (e.event_id) e.* FROM realtime_events e JOIN realtime_event_applications a ON a.event_id=e.event_id WHERE a.case_id=$1 ORDER BY e.event_id,e.received_at DESC LIMIT $2",UUID(case_id),max(1,min(limit,500)))
+            return [self._event_from_row(row) for row in rows]
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime events could not be retrieved") from exc
+
+    async def record_realtime_attempt(self,event_id: str,status: RealtimeProcessingStatus,error: str|None = None)->RealtimeProcessingAttempt:
+        from .persistence import DatabaseError
+        now=datetime.now(timezone.utc)
+        try:
+            async with self._require_pool().acquire() as conn:
+                async with conn.transaction():
+                    number=await conn.fetchval("UPDATE realtime_events SET attempt_count=attempt_count+1,processing_status=$2,error=$3,next_attempt_at=NULL,dead_lettered_at=NULL WHERE event_id=$1 RETURNING attempt_count",event_id,status,error)
+                    if number is None: raise ValueError("Realtime event not found")
+                    attempt=RealtimeProcessingAttempt(attempt_id=str(uuid4()),event_id=event_id,attempt_number=int(number),status=status,error=error,started_at=now,completed_at=now)
+                    await conn.execute("INSERT INTO processing_attempts(attempt_id,event_id,attempt_number,status,error,started_at,completed_at) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(event_id,attempt_number) DO UPDATE SET status=EXCLUDED.status,error=EXCLUDED.error,completed_at=EXCLUDED.completed_at",UUID(attempt.attempt_id),event_id,attempt.attempt_number,status,error,now,now)
+                    return attempt
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime processing attempt could not be recorded") from exc
+
+    async def realtime_attempts(self,event_id: str)->list[RealtimeProcessingAttempt]:
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM processing_attempts WHERE event_id=$1 ORDER BY attempt_number",event_id)
+            return [RealtimeProcessingAttempt(attempt_id=str(row["attempt_id"]),event_id=row["event_id"],attempt_number=row["attempt_number"],status=row["status"],error=row["error"],started_at=row["started_at"],completed_at=row["completed_at"]) for row in rows]
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime processing attempts could not be retrieved") from exc
+
+    async def mark_realtime_failure(self,event_id: str,error: str,max_attempts: int,retry_delay_seconds: int)->RealtimeEvent:
+        from .persistence import DatabaseError
+        now=datetime.now(timezone.utc)
+        try:
+            async with self._require_pool().acquire() as conn:
+                await conn.execute("""UPDATE realtime_events SET processing_status=CASE WHEN attempt_count >= $2 THEN 'DEAD_LETTER' ELSE 'RETRY_PENDING' END,error=$3,next_attempt_at=CASE WHEN attempt_count >= $2 THEN NULL ELSE $4::timestamptz END,dead_lettered_at=CASE WHEN attempt_count >= $2 THEN $5::timestamptz ELSE NULL END WHERE event_id=$1""",event_id,max(1,max_attempts),error,now+timedelta(seconds=max(1,retry_delay_seconds)),now)
+                row=await conn.fetchrow("SELECT * FROM realtime_events WHERE event_id=$1",event_id)
+            if not row: raise ValueError("Realtime event not found")
+            return self._event_from_row(row)
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime event failure state could not be persisted") from exc
+
+    async def list_realtime_failures(self,limit: int = 100)->list[RealtimeOperationalEvent]:
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn:
+                rows=await conn.fetch("SELECT * FROM realtime_events WHERE processing_status IN ('RETRY_PENDING','FAILED','DEAD_LETTER') ORDER BY received_at LIMIT $1",max(1,min(limit,500)))
+            result=[]
+            for row in rows:
+                event=self._event_from_row(row); result.append(RealtimeOperationalEvent(event=event,attempts=await self.realtime_attempts(event.event_id),retryable=event.processing_status in {RealtimeProcessingStatus.RETRY_PENDING,RealtimeProcessingStatus.FAILED}))
+            return result
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime failure queue could not be retrieved") from exc
+
+    async def reset_realtime_event(self,event_id: str)->RealtimeEvent:
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn:
+                await conn.execute("UPDATE realtime_events SET processing_status='RECEIVED',attempt_count=0,error=NULL,next_attempt_at=NULL,dead_lettered_at=NULL WHERE event_id=$1",event_id)
+                row=await conn.fetchrow("SELECT * FROM realtime_events WHERE event_id=$1",event_id)
+            if not row: raise ValueError("Realtime event not found")
+            return self._event_from_row(row)
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime event could not be reset") from exc

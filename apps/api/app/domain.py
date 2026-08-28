@@ -3,12 +3,16 @@ from enum import StrEnum
 from pydantic import BaseModel, Field, field_validator
 
 class CapabilityStatus(StrEnum):
-    SUPPORTED = "SUPPORTED"; UNSUPPORTED = "UNSUPPORTED"; SIMULATED = "SIMULATED"; NOT_CONFIGURED = "NOT_CONFIGURED"
+    SUPPORTED = "SUPPORTED"; UNSUPPORTED = "UNSUPPORTED"; SIMULATED = "SIMULATED"; NOT_CONFIGURED = "NOT_CONFIGURED"; UNAVAILABLE = "UNAVAILABLE"; RATE_LIMITED = "RATE_LIMITED"
 
 class DataMode(StrEnum):
-    HISTORICAL = "HISTORICAL"; POLLING = "POLLING"; WEBHOOK = "WEBHOOK"; SUBSCRIPTION = "SUBSCRIPTION"; SIMULATED = "SIMULATED"
+    HISTORICAL = "HISTORICAL"; POLLING = "POLLING"; WEBHOOK = "WEBHOOK"; SUBSCRIPTION = "SUBSCRIPTION"; SIMULATED = "SIMULATED"; DEVELOPMENT_FIXTURE = "DEVELOPMENT_FIXTURE"
 
 class Chain(StrEnum): ETHEREUM = "ethereum"; TRON = "tron"
+
+def normalize_address(chain: Chain, address: str) -> str:
+    """Normalize address representation without destroying chain semantics."""
+    return address.lower() if chain == Chain.ETHEREUM else address
 
 class EntityType(StrEnum):
     VASP="VASP"; EXCHANGE="EXCHANGE"; SERVICE="SERVICE"; MIXER="MIXER"; BRIDGE="BRIDGE"; PROTOCOL="PROTOCOL"; UNKNOWN="UNKNOWN"
@@ -32,10 +36,50 @@ class TraceDirection(StrEnum):
     FORWARD = "forward"
     BACKWARD = "backward"
 
+class CaseWorkflowStage(StrEnum):
+    NEW="NEW"; INTAKE_COMPLETE="INTAKE_COMPLETE"; DATA_ACQUISITION="DATA_ACQUISITION"; TRACE_ANALYZED="TRACE_ANALYZED"; PATTERNS_ANALYZED="PATTERNS_ANALYZED"; RISK_ASSESSED="RISK_ASSESSED"; WATCHING="WATCHING"; ALERTED="ALERTED"; UNDER_REVIEW="UNDER_REVIEW"; REPORT_READY="REPORT_READY"; CLOSED="CLOSED"
+
 class CaseCreate(BaseModel):
     title: str = Field(min_length=2, max_length=200)
     fraud_type: str = Field(min_length=2, max_length=100)
     priority: str = "MEDIUM"
+    external_case_reference: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=5000)
+    created_by: str | None = Field(default=None, max_length=200)
+
+class CasePatch(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    fraud_type: str | None = Field(default=None, min_length=2, max_length=100)
+    priority: str | None = None
+    description: str | None = Field(default=None, max_length=5000)
+    external_case_reference: str | None = Field(default=None, max_length=200)
+
+class CaseListItem(BaseModel):
+    case_id: str
+    title: str
+    fraud_type: str
+    priority: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    wallet_count: int = 0
+    transaction_count: int = 0
+    workflow_stage: CaseWorkflowStage = CaseWorkflowStage.NEW
+
+class DashboardSummary(BaseModel):
+    active_cases: int = 0
+    wallets_under_review: int = 0
+    high_priority_alerts: int = 0
+    attributed_entities: int = 0
+    observed_transactions: int = 0
+    active_watches: int = 0
+    last_activity_at: datetime | None = None
+
+class DatabaseStatus(BaseModel):
+    status: str
+    migration_status: str
+    detail: str | None = None
+    checked_at: datetime
 
 class WalletCreate(BaseModel):
     address: str = Field(min_length=34, max_length=42)
@@ -46,6 +90,21 @@ class WalletCreate(BaseModel):
         if value.startswith("0x") and len(value) == 42 and all(c in "0123456789abcdefABCDEF" for c in value[2:]): return value
         if value.startswith("T") and len(value) == 34 and all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in value): return value
         raise ValueError("Expected a valid Ethereum or Tron address")
+
+class WalletIntelligence(BaseModel):
+    wallet_id: str
+    chain: Chain
+    address: str
+    first_seen: datetime | None = None
+    last_seen: datetime | None = None
+    transaction_count: int = 0
+    inbound_count: int = 0
+    outbound_count: int = 0
+    assets: list[str] = []
+    case_count: int = 0
+    related_case_ids: list[str] = []
+    evidence_count: int = 0
+    observation_status: str = "PERSISTED_OBSERVATIONS"
 
 class TransactionCreate(BaseModel):
     tx_hash: str = Field(min_length=64, max_length=66)
@@ -74,6 +133,26 @@ class TraceRequest(BaseModel):
     def valid_address(cls, value: str):
         if (value.startswith("0x") and len(value) == 42 and all(c in "0123456789abcdefABCDEF" for c in value[2:])) or (value.startswith("T") and len(value) == 34 and all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in value)): return value
         raise ValueError("Expected a valid Ethereum or Tron address")
+
+class SyntheticCaseRequest(BaseModel):
+    """Development-only request. Generated observations still traverse RealtimeService."""
+    event_count: int = Field(default=50, ge=1, le=1000)
+    scenario: str = Field(default="MULTI_STAGE_FRAUD", min_length=2, max_length=80)
+    scenario_seed: str = Field(default="rrr-synthetic-case", min_length=1, max_length=200)
+
+class MobileTraceRequest(BaseModel):
+    case_id: str = Field(min_length=1, max_length=64)
+    address: str = Field(min_length=34, max_length=42)
+    chain: Chain = Chain.ETHEREUM
+    direction: TraceDirection = TraceDirection.FORWARD
+    max_hops: int = Field(default=3, ge=0, le=6)
+    max_nodes: int = Field(default=100, ge=1, le=1000)
+    max_edges: int = Field(default=2000, ge=1, le=5000)
+    max_transactions: int = Field(default=500, ge=1, le=5000)
+    @field_validator("address")
+    @classmethod
+    def valid_mobile_address(cls, value: str):
+        return TraceRequest(address=value).address
 
 class Transfer(BaseModel):
     tx_hash: str; chain: Chain; block_number: int | None = None; timestamp: datetime | None = None
@@ -112,6 +191,73 @@ class RiskSignal(BaseModel):
 class Evidence(BaseModel):
     evidence_id: str; case_id: str; type: str; chain: Chain; tx_hash: str | None = None
     source: str; captured_at: datetime; metadata: dict = {}
+    content_hash: str | None = None
+    integrity_status: str = "UNVERIFIED"
+
+class EvidenceChainEvent(BaseModel):
+    event_id: str
+    evidence_id: str
+    case_id: str
+    event_type: str
+    actor_id: str | None = None
+    occurred_at: datetime
+    previous_hash: str | None = None
+    event_hash: str
+    metadata: dict = {}
+
+class EvidenceManifest(BaseModel):
+    manifest_id: str
+    case_id: str
+    algorithm: str = "SHA-256"
+    content_hash: str
+    evidence_ids: list[str] = []
+    evidence_count: int = 0
+    created_at: datetime
+    created_by: str | None = None
+
+class EvidenceLedgerEntry(BaseModel):
+    evidence: Evidence
+    chain_of_custody: list[EvidenceChainEvent] = []
+    manifest_ids: list[str] = []
+
+class EvidenceManifestRequest(BaseModel):
+    evidence_ids: list[str] = Field(default_factory=list, max_length=10000)
+    created_by: str | None = Field(default=None, max_length=200)
+
+class ReportType(StrEnum):
+    INVESTIGATION_SUMMARY = "INVESTIGATION_SUMMARY"
+    FUND_FLOW = "FUND_FLOW"
+    EVIDENCE = "EVIDENCE"
+
+class ReportCreateRequest(BaseModel):
+    report_type: ReportType = ReportType.INVESTIGATION_SUMMARY
+    trace_id: str | None = None
+    created_by: str | None = Field(default=None, max_length=200)
+
+class InvestigationReport(BaseModel):
+    report_id: str
+    case_id: str
+    report_type: ReportType
+    trace_id: str | None = None
+    title: str
+    content: str
+    evidence_ids: list[str] = []
+    pattern_ids: list[str] = []
+    assessment_id: str | None = None
+    content_hash: str
+    created_at: datetime
+    created_by: str | None = None
+
+class CaseLink(BaseModel):
+    link_id: str
+    case_id: str
+    related_case_id: str
+    relationship_type: str
+    shared_wallets: list[dict] = []
+    shared_transactions: list[dict] = []
+    confidence_level: ConfidenceLevel = ConfidenceLevel.CONFIRMED
+    explanation: str
+    created_at: datetime
 
 class TraceLimits(BaseModel):
     max_hops: int; max_nodes: int; max_edges: int; max_transactions: int; max_duration: int
@@ -120,6 +266,17 @@ class TraceMetrics(BaseModel):
     node_count: int = 0; edge_count: int = 0; unique_wallet_count: int = 0
     contract_count: int = 0; inbound_edge_count: int = 0; outbound_edge_count: int = 0
     maximum_hop: int = 0; path_count: int = 0; unique_transaction_count: int = 0; unique_asset_count: int = 0
+
+class AcquisitionStatistics(BaseModel):
+    discovered: int = 0
+    normalized: int = 0
+    persisted: int = 0
+    duplicates: int = 0
+    failed: int = 0
+    skipped: int = 0
+    provider: str = ""
+    mode: DataMode = DataMode.HISTORICAL
+    retrieved_at: datetime | None = None
 
 class GraphNode(BaseModel):
     id: str; address: str; depth: int = 0; chain: Chain = Chain.ETHEREUM
@@ -141,18 +298,32 @@ class TraceResult(BaseModel):
     edges: list[GraphEdge]; signals: list[RiskSignal]; evidence: list[Evidence]; limitations: list[str] = []
     trace_id: str = ""; status: str = "COMPLETED"; direction: TraceDirection = TraceDirection.FORWARD
     limits: TraceLimits | None = None; metrics: TraceMetrics = TraceMetrics()
-    paths: list[TransactionPath] = []; flows: list[FundFlow] = []
+    paths: list[TransactionPath] = []; flows: list[FundFlow] = []; acquisition: AcquisitionStatistics = AcquisitionStatistics()
 
 class InvestigationCase(BaseModel):
     case_id: str; title: str; fraud_type: str; priority: str; status: str
     created_at: datetime; updated_at: datetime; wallets: list[WalletCreate] = []; transactions: list[TransactionCreate] = []; latest_trace: TraceResult | None = None
+    external_case_reference: str | None = None
+    description: str | None = None
+    created_by: str | None = None
+    closed_at: datetime | None = None
+    workflow_stage: CaseWorkflowStage = CaseWorkflowStage.NEW
 
 class ProviderCapability(BaseModel): name: str; status: CapabilityStatus; mode: DataMode | None = None; note: str
+
+class ProviderOperationalStatus(BaseModel):
+    provider: str
+    chains: list[Chain] = []
+    status: CapabilityStatus
+    capabilities: list[ProviderCapability] = []
+    checked_at: datetime
+    detail: str
 
 class Entity(BaseModel):
     entity_id:str; name:str; entity_type:EntityType; legal_name:str|None=None; jurisdiction:str|None=None; website:str|None=None; metadata:dict={}
 class AttributionSource(BaseModel):
     source_id:str; name:str; source_type:str; publisher:str|None=None; reference:str; reliability_level:ConfidenceLevel=ConfidenceLevel.UNKNOWN; description:str|None=None
+    dataset_version:str|None=None
 class AddressAttribution(BaseModel):
     attribution_id:str; chain:Chain; address:str; entity_id:str; role:AttributionRole; confidence:ConfidenceLevel; source_id:str; source_reference:str; evidence_id:str|None=None; first_seen:datetime|None=None; last_verified:datetime|None=None; metadata:dict={}
 class AttributionCandidate(BaseModel):
@@ -319,11 +490,29 @@ class AuditEvent(BaseModel):
     metadata: dict = {}
 
 class RealtimeEventType(StrEnum): ADDRESS_ACTIVITY="ADDRESS_ACTIVITY"; REORG="REORG"
-class RealtimeProcessingStatus(StrEnum): RECEIVED="RECEIVED"; VALIDATED="VALIDATED"; NORMALIZED="NORMALIZED"; APPLIED="APPLIED"; DUPLICATE="DUPLICATE"; REJECTED="REJECTED"; FAILED="FAILED"; RETRY_PENDING="RETRY_PENDING"
+class RealtimeProcessingStatus(StrEnum): RECEIVED="RECEIVED"; VALIDATED="VALIDATED"; NORMALIZED="NORMALIZED"; APPLIED="APPLIED"; DUPLICATE="DUPLICATE"; REJECTED="REJECTED"; FAILED="FAILED"; RETRY_PENDING="RETRY_PENDING"; DEAD_LETTER="DEAD_LETTER"
 class ConfirmationState(StrEnum): OBSERVED="OBSERVED"; CONFIRMED="CONFIRMED"; REORGED="REORGED"
 class WatchTargetStatus(StrEnum): ACTIVE="ACTIVE"; PAUSED="PAUSED"; STOPPED="STOPPED"; ERROR="ERROR"
 class WatchExpansionPolicy(StrEnum): MANUAL="MANUAL"; CASE_DEFAULT="CASE_DEFAULT"; HIGH_CONFIDENCE="HIGH_CONFIDENCE"; RISK_TRIGGERED="RISK_TRIGGERED"
 class AlertStatus(StrEnum): NEW="NEW"; ACKNOWLEDGED="ACKNOWLEDGED"; DISMISSED="DISMISSED"; ESCALATED="ESCALATED"
+
+class AlertReviewAction(StrEnum): ACKNOWLEDGE="ACKNOWLEDGE"; DISMISS="DISMISS"; ESCALATE="ESCALATE"
+
+class AlertReviewRequest(BaseModel):
+    action: AlertReviewAction
+    note: str | None = Field(default=None, max_length=5000)
+    actor_id: str | None = Field(default=None, max_length=200)
+
+class AlertReview(BaseModel):
+    review_id: str
+    alert_id: str
+    case_id: str
+    from_status: AlertStatus
+    to_status: AlertStatus
+    action: AlertReviewAction
+    note: str | None = None
+    actor_id: str | None = None
+    created_at: datetime
 
 class RealtimeEvent(BaseModel):
     event_id: str
@@ -348,9 +537,26 @@ class RealtimeEvent(BaseModel):
     confirmation_state: ConfirmationState = ConfirmationState.OBSERVED
     removed: bool = False
     error: str | None = None
+    attempt_count: int = Field(default=0, ge=0)
+    next_attempt_at: datetime | None = None
+    dead_lettered_at: datetime | None = None
+
+class RealtimeProcessingAttempt(BaseModel):
+    attempt_id: str
+    event_id: str
+    attempt_number: int
+    status: RealtimeProcessingStatus
+    error: str | None = None
+    started_at: datetime
+    completed_at: datetime | None = None
+
+class RealtimeOperationalEvent(BaseModel):
+    event: RealtimeEvent
+    attempts: list[RealtimeProcessingAttempt] = []
+    retryable: bool = False
 
 class WatchCreate(BaseModel):
-    address: str = Field(min_length=42,max_length=42)
+    address: str = Field(min_length=34,max_length=42)
     chain: Chain = Chain.ETHEREUM
     source: str = "INVESTIGATOR"
     expansion_policy: WatchExpansionPolicy = WatchExpansionPolicy.MANUAL
@@ -359,6 +565,12 @@ class WatchCreate(BaseModel):
     max_new_edges_per_event: int = Field(default=100,ge=1,le=2000)
     max_value: float = Field(default=0,ge=0)
     allowed_assets: list[str] = []
+    @field_validator("address")
+    @classmethod
+    def valid_address(cls, value: str):
+        if (value.startswith("0x") and len(value) == 42 and all(c in "0123456789abcdefABCDEF" for c in value[2:])) or (value.startswith("T") and len(value) == 34 and all(c in "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz" for c in value)):
+            return value
+        raise ValueError("Expected a valid Ethereum or Tron address")
 
 class WatchTarget(BaseModel):
     watch_id: str
@@ -423,6 +635,96 @@ class RealtimeApplicationResult(BaseModel):
     graph_edge_id: str | None = None
     new_wallet: bool = False
     duplicate: bool = False
+
+# Phase F: cyber-intelligence contracts. These records are source-backed and
+# deliberately separate from blockchain observations and investigative risk.
+class IntelligenceSourceStatus(StrEnum):
+    CONFIGURED="CONFIGURED"; NOT_CONFIGURED="NOT_CONFIGURED"; UNAVAILABLE="UNAVAILABLE"
+class IndicatorType(StrEnum):
+    WALLET="WALLET"; TRANSACTION="TRANSACTION"; CONTRACT="CONTRACT"; DOMAIN="DOMAIN"; OTHER="OTHER"
+class ScreeningOutcome(StrEnum):
+    DIRECT_MATCH="DIRECT_MATCH"; INDIRECT_MATCH="INDIRECT_MATCH"; NO_MATCH="NO_MATCH"; UNKNOWN="UNKNOWN"; NOT_CONFIGURED="NOT_CONFIGURED"
+class IntelligenceConfidence(StrEnum): LOW="LOW"; MEDIUM="MEDIUM"; HIGH="HIGH"; UNKNOWN="UNKNOWN"
+
+class IntelligenceSource(BaseModel):
+    source_id: str
+    name: str
+    source_type: str
+    publisher: str | None = None
+    reference: str
+    dataset_version: str
+    status: IntelligenceSourceStatus = IntelligenceSourceStatus.CONFIGURED
+    retrieved_at: datetime | None = None
+    metadata: dict = {}
+
+class ThreatIndicator(BaseModel):
+    indicator_id: str
+    source_id: str
+    indicator_type: IndicatorType
+    value: str
+    normalized_value: str
+    chain: Chain | None = None
+    confidence: IntelligenceConfidence = IntelligenceConfidence.UNKNOWN
+    first_observed_at: datetime | None = None
+    last_observed_at: datetime | None = None
+    metadata: dict = {}
+
+class SanctionsRecord(BaseModel):
+    record_id: str
+    source_id: str
+    subject_type: IndicatorType
+    value: str
+    normalized_value: str
+    chain: Chain | None = None
+    program: str | None = None
+    listed_at: datetime | None = None
+    revoked_at: datetime | None = None
+    confidence: IntelligenceConfidence = IntelligenceConfidence.HIGH
+    source_reference: str
+    dataset_version: str
+    metadata: dict = {}
+
+class ScreeningMatch(BaseModel):
+    match_id: str
+    record_id: str
+    source_id: str
+    matched_value: str
+    match_type: ScreeningOutcome = ScreeningOutcome.DIRECT_MATCH
+    confidence: IntelligenceConfidence = IntelligenceConfidence.UNKNOWN
+    explanation: str
+    evidence_ids: list[str] = []
+
+class AddressScreeningResult(BaseModel):
+    chain: Chain
+    address: str
+    outcome: ScreeningOutcome
+    source_status: IntelligenceSourceStatus
+    screened_at: datetime
+    matches: list[ScreeningMatch] = []
+    explanation: str
+    limitation: str | None = None
+
+class ContractSecurityFinding(BaseModel):
+    finding_id: str
+    chain: Chain
+    contract_address: str
+    source_id: str
+    finding_type: str
+    severity: PatternSeverity = PatternSeverity.INFO
+    confidence: IntelligenceConfidence = IntelligenceConfidence.UNKNOWN
+    description: str
+    evidence_ids: list[str] = []
+    observed_at: datetime
+    metadata: dict = {}
+
+class CyberIntelligenceSummary(BaseModel):
+    case_id: str
+    screened_addresses: int = 0
+    direct_matches: int = 0
+    indirect_matches: int = 0
+    unknown_results: int = 0
+    source_status: IntelligenceSourceStatus
+    records: list[AddressScreeningResult] = []
 
 # Phase 8: chain-aware forensic intelligence contracts. These models are kept
 # separate from the Phase 0-7 Ethereum graph contracts so existing API payloads
