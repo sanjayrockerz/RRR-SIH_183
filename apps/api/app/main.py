@@ -576,7 +576,7 @@ async def seed_development_case():
     case = await repo.create(CaseCreate(title="RRR Development Fixture Investigation", fraud_type="Investment fraud", priority="HIGH", external_case_reference="DEVELOPMENT-FIXTURE"))
     await repo.add_wallet(case.case_id, WalletCreate(address=root, chain=Chain.ETHEREUM))
     dev_tracer = TraceService(fixture_provider, fixture_registry)
-    trace = await dev_tracer.trace(case.case_id, TraceRequest(address=root, chain=Chain.ETHEREUM, max_hops=6, max_nodes=100, max_edges=500, max_transactions=500))
+    trace = await dev_tracer.trace(case.case_id, TraceRequest(address=root, chain=Chain.ETHEREUM, max_hops=3, max_nodes=100, max_edges=500, max_transactions=500))
     await repo.persist_trace(trace)
     await graph_projection.project(trace)
     await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.TRACE_ANALYZED, provider=trace.provider, result_count=trace.metrics.edge_count, evidence_ids=[item.evidence_id for item in trace.evidence])
@@ -1057,14 +1057,9 @@ async def _run_investigation(case_id: str, body: InvestigationRunRequest) -> Inv
         raise HTTPException(502,str(exc)) from exc
 
 @app.post("/api/v1/cases/{case_id}/investigate", response_model=InvestigationOperationalState)
-async def investigate_case(case_id: str, request: Request, body: InvestigationRunRequest = InvestigationRunRequest()):
+async def investigate_case(case_id: str, body: InvestigationRunRequest = InvestigationRunRequest()):
     try: return await _run_investigation(case_id, body)
     except DatabaseError as exc: return database_failure(exc)
-    except Exception as exc:
-        logging.getLogger("crypto_fraud_intelligence").exception(
-            "investigation_pipeline_failed", extra={"case_id": case_id}
-        )
-        return error_payload(request, 500, f"Investigation pipeline failed: {type(exc).__name__}: {exc}", "INVESTIGATION_PIPELINE_FAILED")
 
 @app.post("/api/v1/cases/{case_id}/investigate/{stage}/retry", response_model=InvestigationOperationalState)
 async def retry_investigation_stage(case_id: str, stage: str, body: InvestigationRunRequest = InvestigationRunRequest()):

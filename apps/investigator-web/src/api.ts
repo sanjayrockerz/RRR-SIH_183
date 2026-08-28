@@ -5,13 +5,12 @@ import type {Attribution,Case,CaseListItem,CaseTransaction,CaseSummarySnapshot,G
 // Production: set VITE_API_BASE_URL to the full backend URL (e.g. https://xxx.railway.app).
 const _apiBaseRaw = import.meta.env.VITE_API_BASE_URL as string | undefined;
 export const API_BASE = _apiBaseRaw === undefined ? 'http://localhost:8000' : _apiBaseRaw.trim();
-const API_DISPLAY = API_BASE || 'Vite proxy → FastAPI localhost:8000';
 export type ApiErrorCategory='API_OFFLINE'|'DATABASE_UNAVAILABLE'|'HTTP_ERROR'|'INVALID_RESPONSE';
 export class ApiError extends Error{category:ApiErrorCategory;status?:number;requestId?:string;constructor(message:string,category:ApiErrorCategory,status?:number,requestId?:string){super(message);this.name='ApiError';this.category=category;this.status=status;this.requestId=requestId}}
 export const apiUrl=(path:string)=>`${API_BASE.replace(/\/$/,'')}${path}`;
 async function request<T>(path:string,init?:RequestInit):Promise<T>{
   const controller=new AbortController();
-  const timeout=window.setTimeout(()=>controller.abort(),30000);
+  const timeout=window.setTimeout(()=>controller.abort(),15000);
   try{
     const response=await fetch(apiUrl(path),{...init,signal:init?.signal||controller.signal});
     const requestId=response.headers.get('x-request-id')||undefined;
@@ -26,7 +25,7 @@ async function request<T>(path:string,init?:RequestInit):Promise<T>{
     return payload as T;
   }catch(error){
     if(error instanceof ApiError)throw error;
-    const message=error instanceof DOMException&&error.name==='AbortError'?`API OFFLINE: Request timed out while contacting ${API_DISPLAY}.`:`API OFFLINE: FastAPI unavailable at ${API_DISPLAY}. Start the API and verify port 8000.`;
+    const message=error instanceof DOMException&&error.name==='AbortError'?`API OFFLINE: Request timed out while contacting FastAPI at ${API_BASE}.`:`API OFFLINE: FastAPI unavailable at ${API_BASE}. Start the API and verify port 8000.`;
     throw new ApiError(message,'API_OFFLINE');
   }finally{window.clearTimeout(timeout)}
 }

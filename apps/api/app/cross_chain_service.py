@@ -44,11 +44,11 @@ class CrossChainService:
             if resolved.conflict or not resolved.selected_entity_id: continue
             candidate=next((item for item in resolved.candidates if item.entity.entity_id==resolved.selected_entity_id),None)
             if not candidate or candidate.entity.entity_type not in {EntityType.VASP,EntityType.EXCHANGE,EntityType.CUSTODIAL_SERVICE}: continue
-            path=next((item for item in sorted(trace.paths, key=lambda item: (len(item.edge_ids), tuple(item.edge_ids), tuple(item.node_ids))) if item.node_ids and item.node_ids[-1] == node_id),None)
+            path=next((item for item in trace.paths if node_id in item.node_ids),None)
             if not path: continue
             candidates.append((len(path.edge_ids),-self._confidence(candidate.confidence),path,node,candidate))
         if candidates:
-            _,_,path,node,candidate=sorted(candidates,key=lambda item:(item[0], item[1], tuple(item[2].edge_ids), item[3].chain.value, item[3].address))[0]
+            _,_,path,node,candidate=sorted(candidates,key=lambda item:item[:2])[0]
             edges=[edge for edge in trace.edges if edge.edge_id in path.edge_ids]
             labels=[]
             for item in path.node_ids:
