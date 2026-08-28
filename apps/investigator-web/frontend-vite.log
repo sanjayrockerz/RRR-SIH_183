@@ -1,0 +1,38 @@
+
+> investigator-web@0.1.0 dev
+> vite --host 0.0.0.0
+
+
+  VITE v8.2.2  ready in 586 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.163.195:5173/  Wi-Fi
+  ➜  Network: http://172.17.192.1:5173/     vEthernet (WSL (Hyp…
+8:56:50 am [vite] (client) hmr update /src/App.tsx, /src/components/RiskPage.tsx, /src/components/PatternsPage.tsx, /src/components/EvidenceLedgerPanel.tsx, /src/components/GraphInspector.tsx, /src/components/RealtimePage.tsx, /src/components/CrossChainPage.tsx, /src/components/ConnectedIntake.tsx, /src/components/WorkflowPanel.tsx, /src/components/SyntheticGenerator.tsx, /src/components/ReadableEvidencePage.tsx, /src/components/ReportsPage.tsx, /src/components/TransactionLedger.tsx, /src/components/SyntheticRealtimeControl.tsx and 6 more
+8:57:06 am [vite] (client) hmr update /src/components/ConnectedIntake.tsx
+8:57:12 am [vite] (client) hmr update /src/components/CaseCommandCenter.tsx
+8:57:59 am [vite] (client) hmr update /src/components/CaseCommandCenter.tsx
+8:58:30 am [vite] (client) hmr update /src/case-command.css
+8:59:03 am [vite] (client) hmr update /src/case-command.css
+9:31:45 am [vite] (client) hmr update /src/components/GraphInspector.tsx
+9:31:45 am [vite] (client) hmr update /src/components/GraphInspector.tsx
+9:31:58 am [vite] (client) hmr update /src/components/CaseCommandCenter.tsx
+9:32:18 am [vite] (client) hmr update /src/components/ReadableEvidencePage.tsx
+9:32:18 am [vite] (client) hmr update /src/components/ReadableEvidencePage.tsx
+9:33:15 am [vite] (client) hmr update /src/components/OperationalDashboard.tsx
+9:33:56 am [vite] (client) hmr update /src/pages.tsx
+10:07:35 am [vite] (client) hmr update /src/components/GraphInspector.tsx
+10:07:35 am [vite] (client) hmr update /src/components/GraphInspector.tsx
+10:07:47 am [vite] (client) hmr update /src/components/CaseCommandCenter.tsx
+10:08:02 am [vite] (client) hmr update /src/App.tsx
+10:13:27 am [vite] (client) hmr update /src/pages.tsx
+10:13:37 am [vite] (client) hmr update /src/styles.css
+10:30:42 am [vite] vite.config.ts changed, restarting server...
+Port 5173 is in use, trying another one...
+10:30:43 am [vite] server restarted.
+
+  ➜  Local:   http://localhost:5174/
+  ➜  Network: http://192.168.163.195:5174/  Wi-Fi
+  ➜  Network: http://172.17.192.1:5174/     vEthernet (WSL (Hyp…
+11:30:11 am [vite] vite.config.ts changed, restarting server...
+11:30:12 am [vite] server restarted.

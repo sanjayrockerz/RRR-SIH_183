@@ -26,9 +26,11 @@ class Settings(BaseSettings):
     auth_jwt_public_key: str | None = None
     auth_jwt_issuer: str | None = None
     auth_jwt_audience: str | None = None
+    alchemy_base_url: str | None = None
     alchemy_page_size: int = 100
     alchemy_max_pages: int = 10
     alchemy_max_transactions: int = 500
+    alchemy_timeout_seconds: float = 30.0
     trace_default_hops: int = 2
     trace_default_max_nodes: int = 100
     realtime_required_confirmations: int = 3

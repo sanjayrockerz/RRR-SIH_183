@@ -35,3 +35,22 @@ class NearestEntityResolver:
                 evidence=[e for edge in path.edges for e in trace.evidence if e.evidence_id==edge.evidence_id]
                 results.append(NearestEntityResult(entity=candidate.entity,address=node.address,chain=node.chain,hop_distance=node.depth,path=path,confidence=candidate.confidence,role=candidate.attributions[0].role,supporting_attributions=candidate.attributions,supporting_sources=candidate.supporting_sources,evidence=evidence,explanation="Observed flow reaches an address attributed by external source data; this does not establish ownership or criminal involvement."))
         return sorted(results,key=lambda r:(r.hop_distance,-_rank[r.confidence],-_rank[max((s.reliability_level for s in r.supporting_sources),key=lambda x:_rank[x],default=ConfidenceLevel.UNKNOWN)]))
+
+
+from abc import ABC, abstractmethod
+class CommercialAttributionProvider(ABC):
+    @abstractmethod
+    async def get_attribution(self, chain: Chain, address: str) -> dict:
+        pass
+
+class ChainalysisAttributionProvider(CommercialAttributionProvider):
+    async def get_attribution(self, chain: Chain, address: str) -> dict:
+        return {"provider": "Chainalysis", "outcome": "UNKNOWN", "wallet_address": address, "chain": chain}
+
+class TrmLabsAttributionProvider(CommercialAttributionProvider):
+    async def get_attribution(self, chain: Chain, address: str) -> dict:
+        return {"provider": "TRM Labs", "outcome": "UNKNOWN", "wallet_address": address, "chain": chain}
+
+class EllipticAttributionProvider(CommercialAttributionProvider):
+    async def get_attribution(self, chain: Chain, address: str) -> dict:
+        return {"provider": "Elliptic", "outcome": "UNKNOWN", "wallet_address": address, "chain": chain}

@@ -1,3 +1,4 @@
+import time
 from abc import abstractmethod
 from datetime import datetime, timezone
 from typing import Any
@@ -38,22 +39,56 @@ class AlchemyEthereumProvider(BlockchainProvider):
 
     async def health(self):
         if not settings.alchemy_api_key:
-            return {"status": "NOT_CONFIGURED", "detail": "ALCHEMY_API_KEY is not configured"}
+            return {
+                "provider": "alchemy",
+                "network": settings.alchemy_network,
+                "configured": False,
+                "reachable": False,
+                "status": "NOT_CONFIGURED",
+                "latency_ms": 0,
+                "last_checked": datetime.now(timezone.utc).isoformat(),
+                "capabilities": ["historical_transfers", "transaction_lookup", "receipt_lookup", "token_transfers"],
+                "detail": "ALCHEMY_API_KEY is not configured"
+            }
+        t0 = time.monotonic()
         try:
             result = await self._rpc("eth_blockNumber", [])
-            return {"status": "CONNECTED", "detail": "Alchemy RPC probe succeeded", "latest_block": result}
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            return {
+                "provider": "alchemy",
+                "network": settings.alchemy_network,
+                "configured": True,
+                "reachable": True,
+                "status": "CONNECTED",
+                "latency_ms": latency_ms,
+                "last_checked": datetime.now(timezone.utc).isoformat(),
+                "capabilities": ["historical_transfers", "transaction_lookup", "receipt_lookup", "token_transfers"],
+                "detail": f"Alchemy RPC probe succeeded, latest block: {result}"
+            }
         except ProviderError as exc:
-            return {"status": "DEGRADED", "detail": str(exc)}
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            return {
+                "provider": "alchemy",
+                "network": settings.alchemy_network,
+                "configured": True,
+                "reachable": False,
+                "status": "DEGRADED",
+                "latency_ms": latency_ms,
+                "last_checked": datetime.now(timezone.utc).isoformat(),
+                "capabilities": ["historical_transfers", "transaction_lookup", "receipt_lookup", "token_transfers"],
+                "detail": f"Alchemy connection degraded: {str(exc)}"
+            }
 
     def _url(self):
         if not settings.alchemy_api_key:
             raise ProviderError("ALCHEMY_API_KEY is not configured")
-        return f"https://{settings.alchemy_network}.g.alchemy.com/v2/{settings.alchemy_api_key}"
+        base = settings.alchemy_base_url or f"https://{settings.alchemy_network}.g.alchemy.com/v2"
+        return f"{base.rstrip('/')}/{settings.alchemy_api_key}"
 
     async def _rpc(self, method: str, params: list[Any]) -> dict:
         attempts=max(1,settings.provider_max_retries+1)
         try:
-            async with httpx.AsyncClient(timeout=settings.provider_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.alchemy_timeout_seconds) as client:
                 for attempt in range(attempts):
                     try:
                         response = await client.post(self._url(), json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params})

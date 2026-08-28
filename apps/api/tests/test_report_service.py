@@ -19,6 +19,10 @@ class Repo:
     async def list_evidence(self, case_id): return [Evidence(evidence_id="e-1", case_id=case_id, type="TRANSACTION", chain="ethereum", tx_hash="0x"+"a"*64, source="fixture", captured_at=datetime(2026,1,1,tzinfo=timezone.utc), metadata={})]
     async def list_patterns(self, case_id, trace_id): return []
     async def latest_risk(self, case_id): return None
+    async def case_screenings(self, case_id): return []
+    async def risk_history(self, case_id): return []
+    async def alerts(self, case_id): return []
+    async def attribution_catalog(self): return [], {}, []
     async def persist_report(self, report): self.saved = report; return report
     async def append_audit_event(self, event): self.audit.append(event)
     async def append_timeline(self, event): self.timeline.append(event)
@@ -30,12 +34,12 @@ async def test_report_is_evidence_backed_and_hashed():
     result = await ReportService(repo).generate("case-1", ReportCreateRequest(report_type=ReportType.EVIDENCE, created_by="test"))
     assert result.evidence_ids == ["e-1"]
     assert len(result.content_hash) == 64
-    assert "OBSERVED FACTS" in result.content
-    assert "not an authenticated legal filing" in result.content
+    assert "1. CASE INFORMATION" in result.content
+    assert "FORENSIC INVESTIGATION REPORT SNAPSHOT" in result.content
     assert repo.audit[0].action == "REPORT_GENERATED"
 
 
 @pytest.mark.asyncio
 async def test_missing_case_is_rejected():
     with pytest.raises(ValueError, match="Case not found"):
-        await ReportService(Repo()).generate("missing", ReportCreateRequest())
+        await ReportService(Repo()).generate("missing", ReportCreateRequest(report_type=ReportType.EVIDENCE, created_by="test"))

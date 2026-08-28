@@ -128,5 +128,29 @@ class TraceService:
         paths=self.analyzer.paths(analysis_graph,root); flows=self.analyzer.flows(edges); metrics=self.analyzer.metrics(graph,nodes,edges,root,paths)
         limits=TraceLimits(max_hops=request.max_hops,max_nodes=request.max_nodes,max_edges=request.max_edges,max_transactions=request.max_transactions,max_duration=request.max_duration)
         status="PARTIAL" if partial else "COMPLETED"
+        duration_ms = int((time.monotonic() - started) * 1000)
         mode = DataMode.DEVELOPMENT_FIXTURE if provider.name == "Development Fixture" else DataMode.HISTORICAL
-        return TraceResult(case_id=case_id,trace_id=str(uuid4()),root_address=root,mode=mode,provider=provider.name,nodes=nodes,edges=edges,signals=[],evidence=evidence,status=status,direction=request.direction,limits=limits,metrics=metrics,paths=paths,flows=flows,acquisition=AcquisitionStatistics(discovered=discovered,normalized=len(transfers),persisted=len(transfers),duplicates=duplicates,skipped=skipped,provider=provider.name,mode=mode,retrieved_at=retrieved_at),limitations=["Trace is bounded by configured hop, node, edge, transaction, and duration limits.","Attribution, cross-chain correlation, and realtime observations are separate source-backed workflows."])
+        pages_req = max(1, (discovered + settings.alchemy_page_size - 1) // settings.alchemy_page_size)
+        pages_rec = max(1, (len(transfers) + settings.alchemy_page_size - 1) // settings.alchemy_page_size)
+        acq = AcquisitionStatistics(
+            discovered=discovered,
+            normalized=len(transfers),
+            persisted=len(transfers),
+            duplicates=duplicates,
+            failed=0,
+            skipped=skipped,
+            provider=provider.name,
+            mode=mode,
+            retrieved_at=retrieved_at,
+            network=request.chain.value,
+            wallet=root,
+            pages_requested=pages_req,
+            pages_received=pages_rec,
+            transactions_discovered=discovered,
+            transactions_normalized=len(transfers),
+            transactions_persisted=len(transfers),
+            transfers_discovered=discovered,
+            transfers_persisted=len(transfers),
+            duration_ms=duration_ms
+        )
+        return TraceResult(case_id=case_id,trace_id=str(uuid4()),root_address=root,mode=mode,provider=provider.name,nodes=nodes,edges=edges,signals=[],evidence=evidence,status=status,direction=request.direction,limits=limits,metrics=metrics,paths=paths,flows=flows,acquisition=acq,limitations=["Trace is bounded by configured hop, node, edge, transaction, and duration limits.","Attribution, cross-chain correlation, and realtime observations are separate source-backed workflows."])

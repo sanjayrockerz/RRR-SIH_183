@@ -18,5 +18,8 @@ import './synthetic-generator.css';
 import './synthetic-console.css';
 import './live-intelligence.css';
 import './run-demo.css';
+import './ledger.css';
+import './case-command.css';
+import './operations.css';
 
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

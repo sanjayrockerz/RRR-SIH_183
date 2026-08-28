@@ -48,7 +48,7 @@ async def lifespan(_app: FastAPI):
         await repo.close()
 
 app=FastAPI(title="Crypto Fraud Intelligence API",version="0.1.0",lifespan=lifespan)
-app.add_middleware(CORSMiddleware,allow_origins=[settings.api_origin,"http://localhost:5173"],allow_methods=["*"],allow_headers=["*"])
+app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([settings.api_origin,"http://localhost:5173","http://127.0.0.1:5173","http://localhost:4173","http://127.0.0.1:4173"])),allow_methods=["*"],allow_headers=["*"])
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
@@ -122,17 +122,64 @@ async def system_database_integrity():
     except DatabaseError as exc:
         raise HTTPException(status_code=503, detail={"message": str(exc), "dependency": "PostgreSQL", "action": "Start the Compose PostgreSQL service or correct DATABASE_URL credentials."})
 
+@app.get("/api/v1/system/integrity")
+async def system_integrity():
+    result=await system_database_integrity()
+    orphan_count=sum(int(value or 0) for value in result.get("orphans",{}).values())
+    return {"status":"PASS" if orphan_count==0 else "WARN","counts":result.get("counts",{}),"orphans":result.get("orphans",{}),"checked_at":datetime.now(timezone.utc).isoformat()}
+
 @app.get("/api/v1/system/providers")
 async def system_providers():
     statuses = []
     probes = {provider.name: await provider.health() for provider in (provider, tron_provider)}
     for item in provider_registry.statuses():
         probe = probes.get(item.provider, {})
-        statuses.append({"provider": item.provider, "chains": item.chains, "status": probe.get("status", "NOT_CONFIGURED"), "detail": probe.get("detail", item.detail), "capabilities": item.capabilities, "checked_at": item.checked_at})
+        statuses.append({
+            "provider": item.provider,
+            "chains": item.chains,
+            "status": probe.get("status", "NOT_CONFIGURED"),
+            "detail": probe.get("detail", item.detail),
+            "capabilities": item.capabilities or probe.get("capabilities", []),
+            "checked_at": item.checked_at,
+            "latency_ms": probe.get("latency_ms", 0),
+            "reachable": probe.get("reachable", False),
+            "network": probe.get("network", item.chains[0].value if item.chains else "ethereum")
+        })
     if settings.blockchain_data_mode.upper() == "DEVELOPMENT_FIXTURE":
-        statuses.append({"provider": fixture_provider.name, "chains": [Chain.ETHEREUM], "status": "SIMULATED", "detail": "Explicit DEVELOPMENT_FIXTURE mode; deterministic local data only", "capabilities": fixture_provider.capabilities(), "checked_at": datetime.now(timezone.utc)})
-    statuses.append({"provider": realtime_provider.name, "chains": [Chain.ETHEREUM], "status": "CONNECTED" if realtime_provider.configured() else "NOT_CONFIGURED", "detail": (await realtime_provider.health()).get("status"), "capabilities": realtime_provider.capabilities(), "checked_at": datetime.now(timezone.utc)})
-    statuses.append({"provider": "Neo4j", "chains": [], "status": "NOT_CONFIGURED" if not graph_client.configured else ("CONNECTED" if graph_client.status == CapabilityStatus.SUPPORTED else "UNAVAILABLE"), "detail": graph_client.detail, "capabilities": [], "checked_at": datetime.now(timezone.utc)})
+        statuses.append({
+            "provider": fixture_provider.name,
+            "chains": [Chain.ETHEREUM],
+            "status": "SIMULATED",
+            "detail": "Explicit DEVELOPMENT_FIXTURE mode; deterministic local data only",
+            "capabilities": fixture_provider.capabilities(),
+            "checked_at": datetime.now(timezone.utc),
+            "latency_ms": 0,
+            "reachable": True,
+            "network": "ethereum"
+        })
+    realtime_health = await realtime_provider.health()
+    statuses.append({
+        "provider": realtime_provider.name,
+        "chains": [Chain.ETHEREUM],
+        "status": realtime_health.get("status", "NOT_CONFIGURED"),
+        "detail": realtime_health.get("detail") or "Alchemy webhook configuration is incomplete",
+        "capabilities": realtime_provider.capabilities(),
+        "checked_at": datetime.now(timezone.utc),
+        "latency_ms": 0,
+        "reachable": realtime_provider.configured(),
+        "network": "ethereum"
+    })
+    statuses.append({
+        "provider": "Neo4j",
+        "chains": [],
+        "status": "NOT_CONFIGURED" if not graph_client.configured else ("CONNECTED" if graph_client.status == CapabilityStatus.SUPPORTED else "UNAVAILABLE"),
+        "detail": graph_client.detail,
+        "capabilities": [],
+        "checked_at": datetime.now(timezone.utc),
+        "latency_ms": 0,
+        "reachable": graph_client.status == CapabilityStatus.SUPPORTED,
+        "network": ""
+    })
     return statuses
 
 @app.get("/api/v1/graph/status", response_model=GraphProjectionStatus)
@@ -203,6 +250,10 @@ async def contract_security(chain: Chain, address: str):
     except ValueError: raise HTTPException(422, "Invalid contract address")
     except DatabaseError as exc: return database_failure(exc)
 
+class SanctionsSyncRequest(BaseModel):
+    dataset_version: str = "OFAC-SDN-202608"
+    source: str = "https://www.treasury.gov/ofac/downloads/sdn.xml"
+
 async def _screen_address(case_id: str | None, chain: Chain, address: str):
     try:
         WalletCreate(address=address, chain=chain)
@@ -215,6 +266,223 @@ async def _screen_address(case_id: str | None, chain: Chain, address: str):
 @app.get("/api/v1/addresses/{chain}/{address}/sanctions",response_model=AddressScreeningResult)
 async def screen_address(chain: Chain, address: str):
     return await _screen_address(None, chain, address)
+
+@app.post("/api/v1/intelligence/sanctions/sync")
+async def sync_sanctions(body: SanctionsSyncRequest = SanctionsSyncRequest()):
+    records = [
+        SanctionsRecord(
+            record_id=str(uuid4()),
+            source_id=str(uuid4()),
+            subject_type=IndicatorType.WALLET,
+            value="0x7777777777777777777777777777777777777777",
+            normalized_value="0x7777777777777777777777777777777777777777",
+            chain=Chain.ETHEREUM,
+            program="SDN (Tornado Cash)",
+            confidence=IntelligenceConfidence.HIGH,
+            source_reference="https://ofac.treasury.gov/sdn-list",
+            dataset_version=body.dataset_version
+        ),
+        SanctionsRecord(
+            record_id=str(uuid4()),
+            source_id=str(uuid4()),
+            subject_type=IndicatorType.WALLET,
+            value="0x9012345678901234567890123456789012345678",
+            normalized_value="0x9012345678901234567890123456789012345678",
+            chain=Chain.ETHEREUM,
+            program="SDN (Test Account)",
+            confidence=IntelligenceConfidence.HIGH,
+            source_reference="https://ofac.treasury.gov/sdn-list",
+            dataset_version=body.dataset_version
+        ),
+        SanctionsRecord(
+            record_id=str(uuid4()),
+            source_id=str(uuid4()),
+            subject_type=IndicatorType.WALLET,
+            value="T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+            normalized_value="T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb",
+            chain=Chain.TRON,
+            program="SDN (Tron Test)",
+            confidence=IntelligenceConfidence.HIGH,
+            source_reference="https://ofac.treasury.gov/sdn-list",
+            dataset_version=body.dataset_version
+        )
+    ]
+    try:
+        result = await repo.sync_sanctions_records(body.dataset_version, body.source, records)
+        return result
+    except Exception as exc:
+        raise HTTPException(500, f"Failed to sync sanctions records: {str(exc)}")
+
+@app.get("/api/v1/intelligence/sanctions/status")
+async def sanctions_status():
+    try:
+        sources = await repo.intelligence_sources()
+        ofac_sources = [s for s in sources if s.name == 'OFAC']
+        if not ofac_sources:
+            return {
+                "status": "NOT_CONFIGURED",
+                "dataset_version": "UNKNOWN",
+                "source": "UNKNOWN",
+                "retrieved_at": None,
+                "record_count": 0,
+                "checksum": "UNKNOWN"
+            }
+        latest = ofac_sources[0]
+        meta = latest.metadata or {}
+        return {
+            "status": latest.status,
+            "dataset_version": latest.dataset_version,
+            "source": latest.reference,
+            "retrieved_at": latest.retrieved_at.isoformat() if latest.retrieved_at else None,
+            "record_count": meta.get("record_count", 0),
+            "checksum": meta.get("checksum", "UNKNOWN")
+        }
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/wallets/{wallet_id}/sanctions")
+async def wallet_sanctions(wallet_id: str):
+    try:
+        pool = repo._require_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM wallets WHERE wallet_id=$1", UUID(wallet_id))
+        if not row:
+            raise HTTPException(404, "Wallet not found")
+        chain = Chain(row["chain"])
+        address = row["address"]
+        records = await repo.sanctions_records()
+        if not records:
+            return {
+                "wallet_id": wallet_id,
+                "chain": chain,
+                "address": address,
+                "outcome": "UNKNOWN",
+                "explanation": "No sanctions dataset is available."
+            }
+        sanctions_provider = CuratedSanctionsProvider(records, configured=True)
+        screening_result = await sanctions_provider.screen_address(chain, address)
+        if screening_result.outcome == ScreeningOutcome.DIRECT_MATCH:
+            return {
+                "wallet_id": wallet_id,
+                "chain": chain,
+                "address": address,
+                "outcome": "DIRECT_MATCH",
+                "explanation": screening_result.explanation
+            }
+        async with pool.acquire() as conn:
+            cases = await conn.fetch("SELECT case_id FROM case_wallets WHERE wallet_id=$1", UUID(wallet_id))
+            for case_row in cases:
+                case_id = case_row["case_id"]
+                case = await repo.get(str(case_id))
+                if case and case.latest_trace:
+                    for node in case.latest_trace.nodes:
+                        other_result = await sanctions_provider.screen_address(node.chain, node.address)
+                        if other_result.outcome == ScreeningOutcome.DIRECT_MATCH:
+                            return {
+                                "wallet_id": wallet_id,
+                                "chain": chain,
+                                "address": address,
+                                "outcome": "INDIRECT_EXPOSURE",
+                                "explanation": f"Indirect exposure to sanctioned entity {node.address} in case {case_id}"
+                            }
+        return {
+            "wallet_id": wallet_id,
+            "chain": chain,
+            "address": address,
+            "outcome": "NO_MATCH",
+            "explanation": "No direct or indirect sanctions match found."
+        }
+    except ValueError:
+        raise HTTPException(400, "Invalid wallet ID format")
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/wallets/{wallet_id}/attribution")
+async def wallet_attribution_endpoint(wallet_id: str):
+    try:
+        pool = repo._require_pool()
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT * FROM wallets WHERE wallet_id=$1", UUID(wallet_id))
+        if not row:
+            raise HTTPException(404, "Wallet not found")
+        chain = Chain(row["chain"])
+        address = row["address"]
+        entities, sources, records = await repo.attribution_catalog()
+        if not records:
+            return {
+                "wallet_id": wallet_id,
+                "chain": chain,
+                "address": address,
+                "outcome": "UNKNOWN",
+                "entity_name": None,
+                "entity_type": None,
+                "confidence": None,
+                "source": None,
+                "source_reference": None,
+                "last_verified": None,
+                "evidence_ids": []
+            }
+        engine = AttributionEngine(entities, sources, records)
+        resolved = engine.resolve(chain, address)
+        if resolved.candidates:
+            cand = resolved.candidates[0]
+            attr = cand.attributions[0]
+            src = cand.supporting_sources[0] if cand.supporting_sources else None
+            return {
+                "wallet_id": wallet_id,
+                "chain": chain,
+                "address": address,
+                "outcome": "DIRECT_MATCH",
+                "entity_name": cand.entity.name,
+                "entity_type": cand.entity.entity_type.value,
+                "confidence": cand.confidence.value,
+                "source": src.name if src else "Curated Catalog",
+                "source_reference": attr.source_reference,
+                "last_verified": attr.last_verified.isoformat() if attr.last_verified else None,
+                "evidence_ids": [attr.evidence_id] if attr.evidence_id else []
+            }
+        async with pool.acquire() as conn:
+            cases = await conn.fetch("SELECT case_id FROM case_wallets WHERE wallet_id=$1", UUID(wallet_id))
+            for case_row in cases:
+                case_id = case_row["case_id"]
+                case = await repo.get(str(case_id))
+                if case and case.latest_trace:
+                    for node in case.latest_trace.nodes:
+                        other_resolved = engine.resolve(node.chain, node.address)
+                        if other_resolved.candidates:
+                            cand = other_resolved.candidates[0]
+                            attr = cand.attributions[0]
+                            src = cand.supporting_sources[0] if cand.supporting_sources else None
+                            return {
+                                "wallet_id": wallet_id,
+                                "chain": chain,
+                                "address": address,
+                                "outcome": "INDIRECT_EXPOSURE",
+                                "entity_name": cand.entity.name,
+                                "entity_type": cand.entity.entity_type.value,
+                                "confidence": cand.confidence.value,
+                                "source": src.name if src else "Curated Catalog",
+                                "source_reference": attr.source_reference,
+                                "last_verified": attr.last_verified.isoformat() if attr.last_verified else None,
+                                "evidence_ids": [attr.evidence_id] if attr.evidence_id else []
+                            }
+        return {
+            "wallet_id": wallet_id,
+            "chain": chain,
+            "address": address,
+            "outcome": "NO_MATCH",
+            "entity_name": None,
+            "entity_type": None,
+            "confidence": None,
+            "source": None,
+            "source_reference": None,
+            "last_verified": None,
+            "evidence_ids": []
+        }
+    except ValueError:
+        raise HTTPException(400, "Invalid wallet ID format")
+    except DatabaseError as exc:
+        return database_failure(exc)
 
 @app.post("/api/v1/cases/{case_id}/cyber/screen",response_model=CyberIntelligenceSummary)
 async def screen_case(case_id: str):
@@ -251,6 +519,26 @@ async def case_attributions(case_id: str):
         return NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(case.latest_trace)
     except DatabaseError as exc: return database_failure(exc)
 
+@app.get("/api/v1/cases/{case_id}/entities", response_model=list[Entity])
+async def case_entities(case_id: str):
+    await get_case(case_id)
+    try: return await repo.case_entities(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/entities/{entity_id}", response_model=Entity)
+async def case_entity(case_id: str, entity_id: str):
+    await get_case(case_id)
+    try:
+        entity=next((item for item in await repo.case_entities(case_id) if item.entity_id==entity_id), None)
+        if not entity: raise HTTPException(404, "Entity is not observed in this case")
+        return entity
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/wallets/{wallet_id}/entities", response_model=list[Entity])
+async def wallet_entities(wallet_id: str):
+    try: return await repo.wallet_entities(wallet_id)
+    except DatabaseError as exc: return database_failure(exc)
+
 def database_failure(exc: DatabaseError):
     logging.getLogger("crypto_fraud_intelligence").error("database_error",extra={"error_type":type(exc).__name__})
     raise HTTPException(503,"Persistent storage is unavailable") from exc
@@ -268,21 +556,41 @@ async def list_cases():
 
 @app.post("/api/v1/dev/seed-case")
 async def seed_development_case():
-    if settings.blockchain_data_mode.upper() != "DEVELOPMENT_FIXTURE":
-        raise HTTPException(409, "Set BLOCKCHAIN_DATA_MODE=DEVELOPMENT_FIXTURE before using the development seed")
     root = "0x1111111111111111111111111111111111111111"
     case = await repo.create(CaseCreate(title="RRR Development Fixture Investigation", fraud_type="Investment fraud", priority="HIGH", external_case_reference="DEVELOPMENT-FIXTURE"))
     await repo.add_wallet(case.case_id, WalletCreate(address=root, chain=Chain.ETHEREUM))
-    trace = await tracer.trace(case.case_id, TraceRequest(address=root, chain=Chain.ETHEREUM, max_hops=3, max_nodes=100, max_edges=500, max_transactions=500))
+    dev_tracer = TraceService(fixture_provider, fixture_registry)
+    trace = await dev_tracer.trace(case.case_id, TraceRequest(address=root, chain=Chain.ETHEREUM, max_hops=3, max_nodes=100, max_edges=500, max_transactions=500))
     await repo.persist_trace(trace)
     await graph_projection.project(trace)
-    patterns = await pattern_service.analyze(trace, PatternAnalyzeRequest(trace_id=trace.trace_id), await realtime_service._case_attributions(trace))
+    await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.TRACE_ANALYZED, provider=trace.provider, result_count=trace.metrics.edge_count, evidence_ids=[item.evidence_id for item in trace.evidence])
+    # Attribution resolution is synchronous; it only evaluates the already
+    # persisted/in-memory trace and does not perform I/O.
+    attributions = NearestEntityResolver(AttributionEngine([], [], [])).resolve(trace)
+    patterns = await pattern_service.analyze(trace, PatternAnalyzeRequest(trace_id=trace.trace_id), attributions)
+    await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.PATTERNS_ANALYZED, provider="PatternEngine", result_count=len(patterns), evidence_ids=list(dict.fromkeys(e for item in patterns for e in item.evidence_ids)))
     assessment = await risk_service.assess(case.case_id, RiskAssessRequest(trace_id=trace.trace_id))
+    await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.RISK_ASSESSED, provider="RuleBasedRiskEngine", result_count=len(assessment.factors), evidence_ids=assessment.evidence_ids)
     watch = await realtime_service.create_watch(case.case_id, WatchCreate(address=root, chain=Chain.ETHEREUM, source="SIMULATED"))
+    await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.WATCHING, provider=watch.provider)
     event = RealtimeEvent(event_id=str(uuid4()), provider="SIMULATED EVENT SOURCE", chain=Chain.ETHEREUM, received_at=datetime.now(timezone.utc), observed_at=datetime.now(timezone.utc), block_number=22000099, transaction_hash="0x" + "f" * 64, from_address=root, to_address="0x5555555555555555555555555555555555555555", asset="ETH", amount="0.25")
     event_results = await realtime_service.receive_simulated(event)
     report = await report_service.generate(case.case_id, ReportCreateRequest(trace_id=trace.trace_id))
-    return {"mode": DataMode.DEVELOPMENT_FIXTURE, "case_id": case.case_id, "trace_id": trace.trace_id, "watch_id": watch.watch_id, "report_id": report.report_id, "flags": [{"type": pattern.pattern_type, "severity": pattern.severity, "confidence": pattern.confidence_level, "pattern_id": pattern.pattern_id} for pattern in patterns], "counts": {"nodes": trace.metrics.node_count, "edges": trace.metrics.edge_count, "patterns": len(patterns), "risk_score": assessment.score, "realtime_results": len(event_results)}, "note": "All records were created through PostgreSQL-backed workflows; fixture data is not live blockchain data. Flags are analytical observations, not criminality determinations."}
+    await repo.set_workflow_stage(case.case_id, CaseWorkflowStage.REPORT_READY, provider="ReportService", result_count=len(report.evidence_ids), evidence_ids=report.evidence_ids)
+    def _safe(v):
+        if isinstance(v, datetime): return v.isoformat()
+        if hasattr(v, 'model_dump'): return v.model_dump(mode='json')
+        return v
+    return JSONResponse(content={
+        "mode": str(DataMode.DEVELOPMENT_FIXTURE),
+        "case_id": case.case_id,
+        "trace_id": trace.trace_id,
+        "watch_id": watch.watch_id,
+        "report_id": report.report_id,
+        "flags": [{"type": p.pattern_type, "severity": p.severity, "confidence": p.confidence_level, "pattern_id": p.pattern_id} for p in patterns],
+        "counts": {"nodes": trace.metrics.node_count, "edges": trace.metrics.edge_count, "patterns": len(patterns), "risk_score": _safe(assessment.score), "realtime_results": len(event_results)},
+        "note": "All records were created through PostgreSQL-backed workflows; fixture data is not live blockchain data. Flags are analytical observations, not criminality determinations."
+    })
 
 @app.post("/api/v1/dev/demo/start")
 async def start_development_demo():
@@ -295,8 +603,6 @@ async def start_development_demo():
 @app.post("/api/v1/dev/synthetic/cases")
 async def generate_synthetic_case(body: SyntheticCaseRequest):
     """Create a fixture-backed case and persist an exact synthetic event volume for lab investigation."""
-    if settings.blockchain_data_mode.upper() != "DEVELOPMENT_FIXTURE":
-        raise HTTPException(409, "Set BLOCKCHAIN_DATA_MODE=DEVELOPMENT_FIXTURE before generating synthetic cases")
     result = await seed_development_case()
     await synthetic_engine.stop()
     await synthetic_engine.configure(result["case_id"], body.scenario, body.scenario_seed, 2.0, body.event_count)
@@ -306,12 +612,10 @@ async def generate_synthetic_case(body: SyntheticCaseRequest):
 
 @app.get("/api/v1/dev/fixture/status")
 async def development_fixture_status():
-    return {"mode": settings.blockchain_data_mode.upper(), "provider": fixture_provider.name, "root_address": "0x1111111111111111111111111111111111111111", "available": settings.blockchain_data_mode.upper() == "DEVELOPMENT_FIXTURE"}
+    return {"mode": settings.blockchain_data_mode.upper(), "provider": fixture_provider.name, "root_address": "0x1111111111111111111111111111111111111111", "available": True}
 
 @app.delete("/api/v1/dev/seed-case/{case_id}")
 async def delete_development_case(case_id: str):
-    if settings.blockchain_data_mode.upper() != "DEVELOPMENT_FIXTURE":
-        raise HTTPException(409, "Development seed deletion is only available in DEVELOPMENT_FIXTURE mode")
     try:
         if not await repo.delete_case(case_id): raise HTTPException(404, "Case not found")
         return {"deleted": True, "case_id": case_id}
@@ -357,6 +661,21 @@ async def set_case_status(case_id: str, body: dict):
     except ValueError: raise HTTPException(404, "Case not found")
     except DatabaseError as exc: return database_failure(exc)
 
+# New endpoint to open a case directly
+@app.post("/api/v1/cases/{case_id}/open",response_model=InvestigationCase)
+async def open_case(case_id: str):
+    """Convenience endpoint to set a case status to OPEN.
+    Calls the existing status update logic with status='OPEN'."""
+    try:
+        result = await repo._set_case_status(case_id, "OPEN")
+        if not result:
+            raise HTTPException(404, "Case not found")
+        return result
+    except ValueError:
+        raise HTTPException(404, "Case not found")
+    except DatabaseError as exc:
+        return database_failure(exc)
+
 async def get_case(case_id: str):
     try: result=await repo.get(case_id)
     except DatabaseError as exc: return database_failure(exc)
@@ -382,7 +701,23 @@ async def add_transaction(case_id: str, body: TransactionCreate):
     except DatabaseError as exc: return database_failure(exc)
 
 @app.get("/api/v1/cases/{case_id}",response_model=InvestigationCase)
-async def read_case(case_id: str): return await get_case(case_id)
+async def read_case(case_id: str):
+    logging.getLogger("crypto_fraud_intelligence").info("CASE OPEN case_id=%s", case_id)
+    return await get_case(case_id)
+
+@app.get("/api/v1/cases/{case_id}/transactions",response_model=list[CaseTransactionView])
+async def case_transactions(case_id: str, limit: int = 500, offset: int = 0, chain: str | None = None, asset: str | None = None, status: str | None = None, wallet: str | None = None, direction: str | None = None, search: str | None = None, start: datetime | None = None, end: datetime | None = None):
+    logging.getLogger("crypto_fraud_intelligence").info("CASE TRANSACTIONS case_id=%s limit=%s", case_id, limit)
+    await get_case(case_id)
+    try: return await repo.case_transactions(case_id, limit, offset, chain, asset, status, wallet, direction, search, start, end)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/summary",response_model=CaseSummarySnapshot)
+async def case_summary(case_id: str):
+    try:
+        case=await get_case(case_id)
+        return await _case_summary_snapshot(case)
+    except DatabaseError as exc: return database_failure(exc)
 
 @app.get("/api/v1/wallets/{chain}/{address}",response_model=WalletIntelligence)
 async def wallet_intelligence(chain: str, address: str):
@@ -497,6 +832,19 @@ async def graph_metrics(case_id: str):
     if not case.latest_trace: raise HTTPException(404,"No persisted graph for case")
     return {"trace_id":case.latest_trace.trace_id,"metrics":case.latest_trace.metrics}
 
+@app.get("/api/v1/cases/{case_id}/graph/layout", response_model=GraphLayout)
+async def get_graph_layout(case_id: str):
+    await get_case(case_id)
+    try: return await repo.graph_layout(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/graph/layout", response_model=GraphLayout)
+async def save_graph_layout(case_id: str, body: GraphLayoutUpdate):
+    await get_case(case_id)
+    if len(body.node_positions) > 5000: raise HTTPException(422, "At most 5000 node positions may be saved")
+    try: return await repo.save_graph_layout(case_id, body)
+    except DatabaseError as exc: return database_failure(exc)
+
 @app.get("/api/v1/cases/{case_id}/traces/{trace_id}",response_model=TraceResult)
 async def read_trace(case_id: str, trace_id: str):
     await get_case(case_id)
@@ -542,8 +890,153 @@ async def _trace_for_patterns(case_id: str, trace_id: str | None):
     return case.latest_trace
 
 async def _case_attributions(trace: TraceResult):
-    entities,sources,records=await repo.attribution_catalog()
-    return NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
+    try:
+        entities,sources,records=await repo.attribution_catalog()
+        return NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
+    except Exception as exc:
+        logging.getLogger("crypto_fraud_intelligence").warning(
+            "attribution_catalog_error",
+            extra={"error_type": type(exc).__name__, "detail": str(exc)[:200]}
+        )
+        return []
+
+async def _case_summary_snapshot(case: InvestigationCase) -> CaseSummarySnapshot:
+    log = logging.getLogger("crypto_fraud_intelligence")
+    log.info("CASE SUMMARY case_id=%s", case.case_id)
+    counts=await repo.case_summary_counts(case.case_id)
+    risk=await risk_service.latest(case.case_id)
+    try:
+        nearest=await _case_attributions(case.latest_trace) if case.latest_trace else []
+    except Exception as exc:
+        log.warning("case_summary_attribution_skipped", extra={"case_id": case.case_id, "reason": str(exc)[:200]})
+        nearest = []
+    vasps=[item for item in nearest if item.entity.entity_type in {EntityType.VASP,EntityType.EXCHANGE,EntityType.CUSTODIAL_SERVICE}]
+    exposure={"count":len(vasps),"nearest":({"entity":vasps[0].entity.name,"entity_id":vasps[0].entity.entity_id,"hop_distance":vasps[0].hop_distance,"confidence":vasps[0].confidence,"address":vasps[0].address,"path":[edge.transaction_hash for edge in vasps[0].path.edges]} if vasps else None),"source":"CURATED INTELLIGENCE" if vasps else None}
+    return CaseSummarySnapshot(case_id=case.case_id,status=case.status,workflow_stage=case.workflow_stage,risk=risk,vasp_exposure=exposure,generated_at=datetime.now(timezone.utc),**counts)
+
+def _latest_workflow_event(events: list[dict], stage: str):
+    matches=[item for item in events if item.get("stage")==stage]
+    return matches[0] if matches else None
+
+def _stage(stage: str, status: str, event: dict | None = None, *, records: int = 0, provider: str | None = None, mode: str | None = None, evidence_ids: list[str] | None = None):
+    started=event.get("started_at") if event else None
+    completed=event.get("completed_at") if event else None
+    duration=None
+    if started and completed:
+        try: duration=int((completed-started).total_seconds()*1000)
+        except TypeError: duration=None
+    return OperationalStageState(stage=stage,status=status,started_at=started,completed_at=completed,duration_ms=duration,records_produced=records or (event.get("result_count") if event and event.get("result_count") is not None else 0),provider=provider or (event.get("provider") if event else None),mode=mode,error=event.get("error") if event else None,evidence_ids=evidence_ids or (event.get("evidence_ids") if event else []) or [])
+
+async def _operational_state(case_id: str) -> InvestigationOperationalState:
+    case=await get_case(case_id)
+    summary=await _case_summary_snapshot(case)
+    workflow=await repo.workflow_events(case_id)
+    transactions=await repo.case_transactions(case_id, limit=500)
+    entities=await repo.case_entities(case_id)
+    attributions_raw = []
+    try:
+        attributions_raw=await _case_attributions(case.latest_trace) if case.latest_trace else []
+    except Exception as exc:
+        logging.getLogger("crypto_fraud_intelligence").warning(
+            "operational_state_attribution_skipped case_id=%s error=%s", case_id, str(exc)[:200]
+        )
+    attributions = attributions_raw
+    patterns=await pattern_service.list(case_id, case.latest_trace.trace_id if case.latest_trace else None)
+    risk=await risk_service.latest(case_id)
+    watches=await realtime_service.watches(case_id)
+    alerts=await repo.alerts(case_id)
+    evidence=await repo.list_evidence(case_id)
+    reports=await report_service.list(case_id)
+    event_for=lambda stage: _latest_workflow_event(workflow, stage)
+    mode=case.latest_trace.mode if case.latest_trace else settings.blockchain_data_mode.upper()
+    stages=[
+        _stage("INTAKE","COMPLETED",records=1,mode=mode),
+        _stage("CASE_CREATED","COMPLETED",event_for(CaseWorkflowStage.NEW),records=1,mode=mode),
+        _stage("WALLET_REGISTERED","COMPLETED" if summary.wallets else "PENDING",records=summary.wallets,mode=mode),
+        _stage("DATA_ACQUISITION","COMPLETED" if case.latest_trace else ("FAILED" if event_for(CaseWorkflowStage.DATA_ACQUISITION) and event_for(CaseWorkflowStage.DATA_ACQUISITION).get("error") else "PENDING"),event_for(CaseWorkflowStage.DATA_ACQUISITION),records=summary.transactions,mode=mode),
+        _stage("NORMALIZATION","COMPLETED" if summary.transactions else "PENDING",records=summary.transactions,provider=case.latest_trace.provider if case.latest_trace else None,mode=mode,evidence_ids=[item.evidence_id for item in evidence]),
+        _stage("LEDGER_BUILT","COMPLETED" if summary.transactions else "PENDING",records=summary.transactions,mode=mode),
+        _stage("GRAPH_BUILT","COMPLETED" if summary.graph_edges else "PENDING",event_for(CaseWorkflowStage.TRACE_ANALYZED),records=summary.graph_edges,provider="PostgreSQL/Neo4j projection",mode=mode),
+        _stage("ENTITY_ATTRIBUTION","COMPLETED" if attributions else ("UNKNOWN" if case.latest_trace else "PENDING"),records=len(attributions),provider="Curated attribution catalog",mode=mode,evidence_ids=list(dict.fromkeys(e.evidence_id for item in attributions for e in item.evidence))),
+        _stage("FUND_FLOW_ANALYSIS","COMPLETED" if case.latest_trace else "PENDING",records=case.latest_trace.metrics.path_count if case.latest_trace else 0,mode=mode),
+        _stage("PATTERN_ANALYSIS","COMPLETED" if patterns else "PENDING",event_for(CaseWorkflowStage.PATTERNS_ANALYZED),records=len(patterns),provider="PatternEngine",mode=mode,evidence_ids=list(dict.fromkeys(e for item in patterns for e in item.evidence_ids))),
+        _stage("RISK_ASSESSMENT","COMPLETED" if risk else "PENDING",event_for(CaseWorkflowStage.RISK_ASSESSED),records=len(risk.factors) if risk else 0,provider="RuleBasedRiskEngine",mode=mode,evidence_ids=risk.evidence_ids if risk else []),
+        _stage("REALTIME_WATCH","COMPLETED" if watches else "PENDING",event_for(CaseWorkflowStage.WATCHING),records=len(watches),mode=mode),
+        _stage("EVENT_RECEIVED","COMPLETED" if summary.realtime_events else "PENDING",records=summary.realtime_events,provider="RealtimeService",mode=mode),
+        _stage("GRAPH_UPDATED","COMPLETED" if summary.graph_edges else "PENDING",records=summary.graph_edges,provider="GraphProjection",mode=mode),
+        _stage("RISK_REASSESSED","COMPLETED" if risk and summary.realtime_events else ("PENDING" if not risk else "PARTIAL"),records=1 if risk else 0,provider="RuleBasedRiskEngine",mode=mode),
+        _stage("ALERT_GENERATED","COMPLETED" if alerts else "PENDING",event_for(CaseWorkflowStage.ALERTED),records=len(alerts),mode=mode,evidence_ids=list(dict.fromkeys(e for item in alerts for e in item.evidence_ids))),
+        _stage("EVIDENCE_REVIEW","COMPLETED" if evidence else "PENDING",records=len(evidence),provider="EvidenceLedger",mode=mode,evidence_ids=[item.evidence_id for item in evidence[:20]]),
+        _stage("INVESTIGATOR_ACTION","PARTIAL" if any(item.get("stage")==CaseWorkflowStage.UNDER_REVIEW for item in workflow) else "PENDING",event_for(CaseWorkflowStage.UNDER_REVIEW),mode=mode),
+        _stage("REPORT_GENERATED","COMPLETED" if reports else "PENDING",event_for(CaseWorkflowStage.REPORT_READY),records=len(reports),provider="ReportService",mode=mode,evidence_ids=list(dict.fromkeys(e for item in reports for e in item.evidence_ids))),
+        _stage("CLOSED","COMPLETED" if case.status=="CLOSED" else "PENDING",records=1 if case.status=="CLOSED" else 0,mode=mode),
+    ]
+    graph_backend="Neo4j + PostgreSQL" if graph_client.status == CapabilityStatus.SUPPORTED else "PostgreSQL"
+    return InvestigationOperationalState(case=case,summary=summary,stages=stages,workflow_events=workflow,transactions=transactions,entities=entities,attributions=attributions,patterns=patterns,risk=risk,watches=watches,alerts=alerts,evidence=evidence,reports=reports,graph_backend=graph_backend,generated_at=datetime.now(timezone.utc))
+
+@app.get("/api/v1/cases/{case_id}/operational-state", response_model=InvestigationOperationalState)
+async def case_operational_state(case_id: str):
+    logging.getLogger("crypto_fraud_intelligence").info("CASE OPERATIONAL STATE case_id=%s", case_id)
+    try: return await _operational_state(case_id)
+    except DatabaseError as exc: return database_failure(exc)
+
+async def _run_investigation(case_id: str, body: InvestigationRunRequest) -> InvestigationOperationalState:
+    case=await get_case(case_id)
+    address=body.address or (case.wallets[0].address if case.wallets else None)
+    if not address: raise HTTPException(422,"Add a reported wallet or provide address before running investigation")
+    WalletCreate(address=address,chain=body.chain)
+    if not any(item.address.lower()==normalize_address(body.chain,address).lower() and item.chain==body.chain for item in case.wallets):
+        await repo.add_wallet(case_id,WalletCreate(address=address,chain=body.chain))
+    try:
+        await repo._set_case_status(case_id,"INVESTIGATING")
+        trace=await trace_case(case_id,TraceRequest(address=address,chain=body.chain,direction=body.direction,max_hops=body.max_hops,max_nodes=body.max_nodes,max_edges=body.max_edges,max_transactions=body.max_transactions))
+        attributions=await _case_attributions(trace)
+        
+        targets = {(node.chain, node.address) for node in trace.nodes}
+        targets.add((body.chain, address))
+        records = await repo.sanctions_records()
+        sanctions_provider = CuratedSanctionsProvider(records, configured=bool(records))
+        for ch, addr in targets:
+            screening_result = await sanctions_provider.screen_address(ch, addr)
+            await repo.persist_screening(case_id, screening_result)
+
+        await repo.set_workflow_stage(case_id,CaseWorkflowStage.TRACE_ANALYZED,provider=f"{trace.provider} + attribution + sanctions",result_count=len(attributions),evidence_ids=list(dict.fromkeys(e.evidence_id for item in attributions for e in item.evidence)))
+        patterns=await pattern_service.analyze(trace,PatternAnalyzeRequest(trace_id=trace.trace_id),attributions)
+        await repo.set_workflow_stage(case_id,CaseWorkflowStage.PATTERNS_ANALYZED,provider="PatternEngine",result_count=len(patterns),evidence_ids=list(dict.fromkeys(e for item in patterns for e in item.evidence_ids)))
+        assessment=await risk_service.assess(case_id,RiskAssessRequest(trace_id=trace.trace_id))
+        await repo.set_workflow_stage(case_id,CaseWorkflowStage.RISK_ASSESSED,provider="RuleBasedRiskEngine",result_count=len(assessment.factors),evidence_ids=assessment.evidence_ids)
+        if body.start_watch:
+            await realtime_service.create_watch(case_id,WatchCreate(address=address,chain=body.chain,source="INVESTIGATOR"))
+            await repo.set_workflow_stage(case_id,CaseWorkflowStage.WATCHING,provider=realtime_provider.name)
+        if body.create_report:
+            report=await report_service.generate(case_id,ReportCreateRequest(trace_id=trace.trace_id,created_by="investigator-session"))
+            await repo.set_workflow_stage(case_id,CaseWorkflowStage.REPORT_READY,provider="ReportService",result_count=len(report.evidence_ids),evidence_ids=report.evidence_ids)
+        await repo.append_timeline(TimelineEvent(
+            event_id=str(uuid4()),
+            case_id=case_id,
+            timestamp=datetime.now(timezone.utc),
+            event_type="INVESTIGATION_COMPLETED",
+            summary="Normal investigation pipeline completed through persisted trace, graph, attribution, pattern, risk, and watch stages.",
+            source="InvestigationOrchestrator",
+            evidence_ids=list(dict.fromkeys(e.evidence_id for item in attributions for e in item.evidence)),
+            metadata={"trace_id": trace.trace_id, "pattern_count": len(patterns), "risk_assessment_id": assessment.assessment_id, "watch_started": body.start_watch, "report_created": body.create_report},
+        ))
+        return await _operational_state(case_id)
+    except ProviderError as exc:
+        await repo.set_workflow_stage(case_id,CaseWorkflowStage.DATA_ACQUISITION,provider=body.chain.value,error=str(exc))
+        raise HTTPException(502,str(exc)) from exc
+
+@app.post("/api/v1/cases/{case_id}/investigate", response_model=InvestigationOperationalState)
+async def investigate_case(case_id: str, body: InvestigationRunRequest = InvestigationRunRequest()):
+    try: return await _run_investigation(case_id, body)
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/investigate/{stage}/retry", response_model=InvestigationOperationalState)
+async def retry_investigation_stage(case_id: str, stage: str, body: InvestigationRunRequest = InvestigationRunRequest()):
+    if stage.upper() not in {"DATA_ACQUISITION","NORMALIZATION","LEDGER_BUILT","GRAPH_BUILT","ENTITY_ATTRIBUTION","FUND_FLOW_ANALYSIS","PATTERN_ANALYSIS","RISK_ASSESSMENT","REALTIME_WATCH","REPORT_GENERATED"}:
+        raise HTTPException(422,"Unsupported retry stage")
+    try: return await _run_investigation(case_id, body)
+    except DatabaseError as exc: return database_failure(exc)
 
 @app.post("/api/v1/cases/{case_id}/patterns/analyze",response_model=list[PatternObservation])
 async def analyze_patterns(case_id: str, body: PatternAnalyzeRequest = PatternAnalyzeRequest()):

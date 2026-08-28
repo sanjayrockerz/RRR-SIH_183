@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.domain import Chain, DataMode, Evidence, GraphEdge, GraphNode, RealtimeEvent, TraceResult, Transfer
+from app.config import settings
 from app.graph.neo4j_client import Neo4jClient
 from app.graph.neo4j_repository import deterministic_id
 from app.graph.graph_projection import GraphProjectionService
@@ -15,7 +16,9 @@ def test_relationship_ids_are_deterministic_and_order_sensitive():
 
 
 @pytest.mark.asyncio
-async def test_projection_is_explicitly_not_configured_without_credentials():
+async def test_projection_is_explicitly_not_configured_without_credentials(monkeypatch):
+    monkeypatch.setattr(settings, "neo4j_uri", "")
+    monkeypatch.setattr(settings, "neo4j_password", "")
     client = Neo4jClient()
     await client.connect()
     service = GraphProjectionService(client)

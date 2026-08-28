@@ -45,6 +45,8 @@ class CuratedSanctionsProvider(CyberIntelligenceProvider):
         normalized = address.lower()
         if not self.configured:
             return AddressScreeningResult(chain=chain, address=normalized, outcome=ScreeningOutcome.NOT_CONFIGURED, source_status=self.status, screened_at=now, explanation="Sanctions screening source is not configured.", limitation="No sanctions conclusion can be drawn until an approved, versioned source is configured.")
+        if not self.records:
+            return AddressScreeningResult(chain=chain, address=normalized, outcome=ScreeningOutcome.UNKNOWN, source_status=self.status, screened_at=now, explanation="No versioned sanctions records are available.", limitation="No sanctions conclusion can be drawn until database contains valid versioned sanctions records.")
         matches = []
         for record in self.records:
             if record.subject_type.value != "WALLET" or record.normalized_value.lower() != normalized:

@@ -73,3 +73,38 @@ class CyberPersistenceMixin:
                 return result
         except (asyncpg.PostgresError, ValueError) as exc:
             raise DatabaseError("Screening results could not be retrieved") from exc
+
+    async def sync_sanctions_records(self, dataset_version: str, source: str, records: list[SanctionsRecord]):
+        from .persistence import DatabaseError
+        import hashlib
+        pool = self._require_pool()
+        now = datetime.now(timezone.utc)
+        source_id = UUID(str(__import__("uuid").uuid4()))
+        checksum = hashlib.sha256(json.dumps([r.model_dump() for r in records], default=str).encode('utf-8')).hexdigest()
+        try:
+            async with pool.acquire() as conn:
+                async with conn.transaction():
+                    await conn.execute("""
+                        INSERT INTO cyber_intelligence_sources(source_id, name, source_type, reference, dataset_version, status, retrieved_at, metadata, created_at, updated_at)
+                        VALUES($1, 'OFAC', 'SANCTIONS', $2, $3, 'CONFIGURED', $4, $5, $4, $4)
+                        ON CONFLICT(name, dataset_version) DO UPDATE SET updated_at=$4, status='CONFIGURED', metadata=$5
+                    """, source_id, source, dataset_version, now, json.dumps({"checksum": checksum, "record_count": len(records)}))
+                    
+                    actual_source_id = await conn.fetchval("SELECT source_id FROM cyber_intelligence_sources WHERE name='OFAC' AND dataset_version=$1", dataset_version)
+                    await conn.execute("DELETE FROM sanctions_records WHERE source_id=$1", actual_source_id)
+                    
+                    for r in records:
+                        await conn.execute("""
+                            INSERT INTO sanctions_records(record_id, source_id, subject_type, value, normalized_value, chain, program, listed_at, revoked_at, confidence, source_reference, dataset_version, metadata)
+                            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                            ON CONFLICT DO NOTHING
+                        """, UUID(str(r.record_id)), actual_source_id, r.subject_type.value, r.value, r.normalized_value, r.chain.value if r.chain else None, r.program, r.listed_at, r.revoked_at, r.confidence.value, r.source_reference, dataset_version, json.dumps(r.metadata))
+            return {
+                "dataset_version": dataset_version,
+                "source": source,
+                "retrieved_at": now.isoformat(),
+                "record_count": len(records),
+                "checksum": checksum
+            }
+        except (asyncpg.PostgresError, ValueError) as exc:
+            raise DatabaseError("Sanctions sync failed") from exc

@@ -274,3 +274,21 @@ Status: PARTIAL - local development workflow proven
 The Docker stack is now running with PostgreSQL, Neo4j, API and web services. `POST /api/v1/dev/seed-case` creates a clearly marked `DEVELOPMENT_FIXTURE` investigation through persisted case, wallet, transaction, graph, pattern, risk, watch, realtime, evidence and report stages. Database integrity reported zero orphan records during validation. The graph layout now follows observed hop relationships and uses semantic colors; the evidence workspace exposes provenance and readable record labels with loading, empty and retry states.
 
 Live Alchemy remains `NOT_CONFIGURED` without `ALCHEMY_API_KEY`. Realtime development processing is `SIMULATED`, and alert creation is data-dependent on an actual risk delta. See `docs/audit/operational-readiness-final.md` and `docs/architecture/mobile-rrr.md`.
+
+## Phase 10 - Operational command center and canonical ledger
+
+Status: IN PROGRESS - first operational UI vertical slice complete.
+
+Implemented: a backend-driven operational dashboard, persisted case command center, case-scoped canonical transaction ledger with filters/sort/detail drawer, and deterministic synthetic simulator controls for scenario, seed, speed and 10/50/100/500/1000 event limits. The ledger endpoint reads `transactions`, `transaction_transfers`, `case_transactions`, and evidence references from PostgreSQL rather than deriving rows from frontend graph state.
+
+Validation: Python compilation passed; backend test suite `68 passed, 2 skipped`; frontend TypeScript/Vite build passed; Docker API smoke returned persisted transaction/evidence records from `GET /api/v1/cases/{case_id}/transactions`.
+
+Remaining: complete source-backed entity/VASP and threat workspaces, full graph interaction/filter persistence, case-summary aggregation fields, live browser visual QA (browser runtime is unavailable on this machine), and test coverage for the new ledger route.
+
+## Phase 10B - Entity/VASP intelligence, transaction ledger, and operational graph
+
+Status: PARTIAL - backend contracts and curated development attribution foundation implemented; runtime migration verification blocked because Docker Desktop is not running.
+
+Implemented: case-scoped transaction filters, case/wallet entity endpoints, source-versioned curated development VASP data, VASP exposure in case summary, and persisted graph-layout API/schema. The dataset is explicitly `CURATED_INTELLIGENCE / DEVELOPMENT_SYNTHETIC`; it does not make a real-world ownership claim.
+
+Validation: Python compilation passed; backend test suite `68 passed, 2 skipped`; frontend TypeScript/Vite build passed. Docker/API validation is currently blocked by a missing Docker Desktop Linux-engine pipe, so migration and browser interaction assertions remain outstanding.

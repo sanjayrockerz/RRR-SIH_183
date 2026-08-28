@@ -1,0 +1,21 @@
+{
+  "dataset_name": "RRR Development Curated VASP Dataset",
+  "dataset_version": "2026-08-development",
+  "mode": "CURATED_INTELLIGENCE / DEVELOPMENT_SYNTHETIC",
+  "disclaimer": "This development fixture is not a commercial attribution feed and does not identify a real exchange ownership address.",
+  "records": [
+    {
+      "entity_name": "Example Exchange — Development Attribution",
+      "entity_type": "VASP",
+      "address": "0x9999999999999999999999999999999999999999",
+      "chain": "ethereum",
+      "label": "Synthetic scenario VASP destination",
+      "source": "RRR Development Curated VASP Dataset",
+      "source_url": "data/intelligence/vasps/vasp-addresses.json",
+      "confidence": "HIGH",
+      "valid_from": "2026-08-01T00:00:00Z",
+      "valid_until": null,
+      "dataset_version": "2026-08-development"
+    }
+  ]
+}

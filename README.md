@@ -29,10 +29,10 @@ The current release is historical Ethereum analysis through Alchemy. SAHYOG/NCRP
 
 ## Quick start
 
-1. Start PostgreSQL: `docker compose up -d postgres`.
-2. Copy `.env.example` to `.env` and set `ALCHEMY_API_KEY`.
-3. Start the API: `python -m venv .venv && .\.venv\Scripts\Activate.ps1 && pip install -r apps/api/requirements.txt && uvicorn app.main:app --reload --app-dir apps/api`.
-4. Start the web app: `cd apps/investigator-web && npm install && npm run dev`.
+1. Recommended full stack: `docker compose up --build`.
+2. For native development, copy `.env.example` to `.env`, activate the virtual environment, and install `apps/api/requirements.txt`.
+3. Start FastAPI from the repository root: `uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir apps/api`.
+4. Start the web app in a second terminal: `cd apps/investigator-web && npm install && npm run dev`.
 
 The API uses PostgreSQL as its source of truth. On startup it applies ordered migrations from `infrastructure/postgres` and records applied versions in `schema_migrations` (set `DATABASE_AUTO_MIGRATE=false` if migrations are managed externally). Attribution remains source-backed and does not establish ownership or criminal involvement.
 

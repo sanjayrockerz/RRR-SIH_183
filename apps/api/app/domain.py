@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 class CapabilityStatus(StrEnum):
     SUPPORTED = "SUPPORTED"; UNSUPPORTED = "UNSUPPORTED"; SIMULATED = "SIMULATED"; NOT_CONFIGURED = "NOT_CONFIGURED"; UNAVAILABLE = "UNAVAILABLE"; RATE_LIMITED = "RATE_LIMITED"
@@ -15,9 +15,10 @@ def normalize_address(chain: Chain, address: str) -> str:
     return address.lower() if chain == Chain.ETHEREUM else address
 
 class EntityType(StrEnum):
-    VASP="VASP"; EXCHANGE="EXCHANGE"; SERVICE="SERVICE"; MIXER="MIXER"; BRIDGE="BRIDGE"; PROTOCOL="PROTOCOL"; UNKNOWN="UNKNOWN"
+    VASP="VASP"; EXCHANGE="EXCHANGE"; CUSTODIAL_SERVICE="CUSTODIAL_SERVICE"; NON_CUSTODIAL_WALLET="NON_CUSTODIAL_WALLET"; SERVICE="SERVICE"; MIXER="MIXER"; BRIDGE="BRIDGE"; CONTRACT="CONTRACT"; SCAM_INFRASTRUCTURE="SCAM_INFRASTRUCTURE"; PROTOCOL="PROTOCOL"; UNKNOWN="UNKNOWN"
 class AttributionRole(StrEnum):
     DEPOSIT="DEPOSIT"; HOT_WALLET="HOT_WALLET"; COLD_WALLET="COLD_WALLET"; TREASURY="TREASURY"; CONTRACT="CONTRACT"; SERVICE="SERVICE"; UNKNOWN="UNKNOWN"
+    MIXER_CONTRACT="MIXER_CONTRACT"; BRIDGE_DEPOSIT="BRIDGE_DEPOSIT"; DEPOSIT_ADDRESS="DEPOSIT_ADDRESS"; WITHDRAWAL="WITHDRAWAL"; BRIDGE_WITHDRAWAL="BRIDGE_WITHDRAWAL"
 class ConfidenceLevel(StrEnum):
     UNKNOWN="UNKNOWN"; LOW="LOW"; MEDIUM="MEDIUM"; HIGH="HIGH"; CONFIRMED="CONFIRMED"
 
@@ -64,6 +65,9 @@ class CaseListItem(BaseModel):
     updated_at: datetime
     wallet_count: int = 0
     transaction_count: int = 0
+    external_case_reference: str | None = None
+    wallet_address: str | None = None
+    risk_band: str | None = None
     workflow_stage: CaseWorkflowStage = CaseWorkflowStage.NEW
 
 class DashboardSummary(BaseModel):
@@ -74,6 +78,81 @@ class DashboardSummary(BaseModel):
     observed_transactions: int = 0
     active_watches: int = 0
     last_activity_at: datetime | None = None
+    investigations_today: int = 0
+    wallets_under_investigation: int = 0
+    transactions_analyzed: int = 0
+    graph_nodes: int = 0
+    graph_edges: int = 0
+    open_alerts: int = 0
+    critical_cases: int = 0
+    latest_blockchain_event: dict | None = None
+    latest_graph_mutation: dict | None = None
+    latest_pattern: dict | None = None
+    latest_risk_change: dict | None = None
+    latest_alert: dict | None = None
+
+class CaseSummarySnapshot(BaseModel):
+    case_id: str
+    status: str
+    workflow_stage: CaseWorkflowStage
+    wallets: int = 0
+    transactions: int = 0
+    graph_nodes: int = 0
+    graph_edges: int = 0
+    patterns: int = 0
+    alerts: int = 0
+    evidence: int = 0
+    realtime_events: int = 0
+    active_watches: int = 0
+    vasp_exposure: dict = {}
+    risk: 'RiskAssessment | None' = None
+    generated_at: datetime
+
+class OperationalStageState(BaseModel):
+    stage: str
+    status: str = "PENDING"
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_ms: int | None = None
+    records_produced: int = 0
+    provider: str | None = None
+    mode: str | None = None
+    error: str | None = None
+    evidence_ids: list[str] = []
+
+class InvestigationOperationalState(BaseModel):
+    case: 'InvestigationCase'
+    summary: CaseSummarySnapshot
+    stages: list[OperationalStageState] = []
+    workflow_events: list[dict] = []
+    transactions: list['CaseTransactionView'] = []
+    entities: list['Entity'] = []
+    attributions: list['NearestEntityResult'] = []
+    patterns: list['PatternObservation'] = []
+    risk: 'RiskAssessment | None' = None
+    watches: list['WatchTarget'] = []
+    alerts: list['Alert'] = []
+    evidence: list['Evidence'] = []
+    reports: list['InvestigationReport'] = []
+    graph_backend: str = "PostgreSQL"
+    generated_at: datetime
+
+class InvestigationRunRequest(BaseModel):
+    address: str | None = Field(default=None, min_length=34, max_length=42)
+    chain: Chain = Chain.ETHEREUM
+    direction: TraceDirection = TraceDirection.FORWARD
+    max_hops: int = Field(default=3, ge=0, le=6)
+    max_nodes: int = Field(default=100, ge=1, le=1000)
+    max_edges: int = Field(default=500, ge=1, le=5000)
+    max_transactions: int = Field(default=500, ge=1, le=5000)
+    start_watch: bool = True
+    create_report: bool = False
+    @field_validator("address")
+    @classmethod
+    def valid_optional_address(cls, value: str | None):
+        if value is None or value == "":
+            return value
+        return TraceRequest(address=value).address
 
 class DatabaseStatus(BaseModel):
     status: str
@@ -179,6 +258,32 @@ class TransactionRecord(BaseModel):
     timestamp: datetime | None = None; status: str = "OBSERVED"; from_address: str
     to_address: str; native_value: float | None = None; fee: float | None = None
     raw_reference: dict = {}
+
+class CaseTransactionView(BaseModel):
+    """Case-scoped ledger record assembled from canonical transaction, transfer and evidence rows."""
+    case_id: str
+    transaction_id: str
+    tx_hash: str
+    chain: Chain
+    block_number: int | None = None
+    timestamp: datetime | None = None
+    status: str = "UNKNOWN"
+    from_address: str
+    to_address: str
+    asset: str
+    amount: str
+    transfer_type: str = "native"
+    contract_address: str | None = None
+    token_id: str | None = None
+    decimals: int | None = None
+    provider: str
+    observed_at: datetime | None = None
+    evidence_ids: list[str] = []
+    risk_score: float = 0
+    risk_band: str = "LOW"
+    risk_factors: list[dict] = []
+    pattern_observations: list[dict] = []
+    entity_exposure: list[dict] = []
 
 class PersistedGraphEdge(BaseModel):
     edge_id: str; case_id: str; transaction_id: str; source_wallet: str
@@ -286,6 +391,37 @@ class GraphNode(BaseModel):
 class GraphEdge(BaseModel):
     source: str; target: str; transfer: Transfer; edge_id: str = ""; hop: int = 0
     asset_type: str = "native"; transaction_hash: str = ""; evidence_id: str | None = None
+    from_address: str = Field(default="", alias="from")
+    to_address: str = Field(default="", alias="to")
+    asset: str = ""
+    amount: str = ""
+    timestamp: datetime | None = None
+    block_number: int | None = None
+    direction: str = "forward"
+    model_config = {
+        "populate_by_name": True
+    }
+    @model_validator(mode='after')
+    def populate_fields(self):
+        if self.transfer:
+            self.from_address = self.transfer.source
+            self.to_address = self.transfer.destination
+            self.asset = self.transfer.asset
+            self.amount = self.transfer.amount
+            self.timestamp = self.transfer.timestamp
+            self.block_number = self.transfer.block_number
+            self.transaction_hash = self.transfer.tx_hash
+        return self
+
+class GraphLayout(BaseModel):
+    case_id: str
+    node_positions: dict[str, dict[str, float | bool]] = {}
+    viewport: dict[str, float] = {}
+    updated_at: datetime | None = None
+
+class GraphLayoutUpdate(BaseModel):
+    node_positions: dict[str, dict[str, float | bool]] = {}
+    viewport: dict[str, float] = {}
 
 class TransactionPath(BaseModel):
     path_id: str; node_ids: list[str]; edges: list[GraphEdge]
