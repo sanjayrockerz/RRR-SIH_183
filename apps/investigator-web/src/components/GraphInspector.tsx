@@ -9,12 +9,6 @@ const identity = (chain: string | undefined, address: string) => `${chainKey(cha
 
 type Point = { x: number; y: number };
 
-const GRAPH_BOUNDS = { left: 55, right: 945, top: 55, bottom: 445 };
-const clampPoint = (point: Point): Point => ({
-  x: Math.max(GRAPH_BOUNDS.left, Math.min(GRAPH_BOUNDS.right, point.x)),
-  y: Math.max(GRAPH_BOUNDS.top, Math.min(GRAPH_BOUNDS.bottom, point.y)),
-});
-
 function layout(nodes: Node[], edges: Edge[], root: string) {
   const rootKey = identity(nodes.find(node => node.address.toLowerCase() === root.toLowerCase())?.chain, root);
   const adjacency = new Map<string, string[]>();
@@ -43,14 +37,13 @@ function layout(nodes: Node[], edges: Edge[], root: string) {
   }
   const positions = new Map<string, Point>();
   const maxLevel = Math.max(...Array.from(groups.keys()), 0);
-  // Keep crowded rows inside the fixed 1000x500 SVG viewport.
-  const height = GRAPH_BOUNDS.bottom - GRAPH_BOUNDS.top;
+  const height = Math.max(560, Math.max(...Array.from(groups.values()).map(group => group.length), 1) * 120);
   for (const [level, group] of groups) {
-    const x = GRAPH_BOUNDS.left + (level / Math.max(maxLevel, 1)) * (GRAPH_BOUNDS.right - GRAPH_BOUNDS.left);
+    const x = 120 + (level / Math.max(maxLevel, 1)) * 760;
     group.forEach((node, index) => {
       positions.set(identity(node.chain, node.address), {
         x,
-        y: GRAPH_BOUNDS.top + (index + 1) * height / (group.length + 1),
+        y: 72 + (index + 1) * (height - 120) / (group.length + 1),
       });
     });
   }
@@ -115,22 +108,11 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   // Compute visibility based on collapse status
   const visibleFlow = useMemo(() => {
     const normalizedCollapsed = new Set(Array.from(collapsedNodes).map(addr => addr.toLowerCase()));
-    // The backend selects one persisted primary path. The renderer receives
-    // only that validated chain for the main investigation flow.
-    const selectedEdgeIds = new Set(primaryPath?.edge_ids || []);
-    const selectedTransactionHashes = new Set((primaryPath?.transaction_hashes || []).map(hash => hash.toLowerCase()));
-    const matchedById = trace.edges.filter(edge => selectedEdgeIds.has(edge.edge_id));
-    const pathPairs = new Set((primaryPath?.node_ids || []).slice(0, -1).map((source, index) => `${source.toLowerCase()}→${primaryPath!.node_ids[index + 1].toLowerCase()}`));
-    const matchedByTransaction = trace.edges.filter(edge => selectedTransactionHashes.has(edge.transaction_hash.toLowerCase()) && pathPairs.has(`${edge.source.toLowerCase()}→${edge.target.toLowerCase()}`));
-    const hasResolvedPrimaryEdges = selectedEdgeIds.size > 0 && matchedById.length === selectedEdgeIds.size;
-    const sourceEdges = primaryPath && (hasResolvedPrimaryEdges || matchedByTransaction.length > 0)
-      ? (hasResolvedPrimaryEdges ? matchedById : matchedByTransaction)
-      : trace.edges;
     const visited = new Set<string>([trace.root_address.toLowerCase()]);
     const queue = [trace.root_address.toLowerCase()];
     const outgoing = new Map<string, Edge[]>();
     
-    sourceEdges.forEach(edge => {
+    trace.edges.forEach(edge => {
       const src = edge.source.toLowerCase();
       outgoing.set(src, [...(outgoing.get(src) || []), edge]);
     });
@@ -148,12 +130,12 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
     }
 
     const filteredNodes = trace.nodes.filter(n => visited.has(n.address.toLowerCase()));
-    const filteredEdges = sourceEdges.filter(e => visited.has(e.source.toLowerCase()) && visited.has(e.target.toLowerCase()));
+    const filteredEdges = trace.edges.filter(e => visited.has(e.source.toLowerCase()) && visited.has(e.target.toLowerCase()));
     return { nodes: filteredNodes, edges: filteredEdges };
-  }, [trace.nodes, trace.edges, trace.root_address, collapsedNodes, primaryPath]);
+  }, [trace.nodes, trace.edges, trace.root_address, collapsedNodes]);
 
   const riskTransactions = useMemo(() => {
-    return new Set(risk?.factors.filter(item => item.definition_id !== 'graph:hop_depth').flatMap(item => item.transaction_hashes) || []);
+    return new Set(risk?.factors.flatMap(item => item.transaction_hashes) || []);
   }, [risk]);
 
   const visibleEdges = useMemo(() => {
@@ -173,7 +155,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
 
   const point = (address: string, chain?: string) => {
     const key = identity(chain, address);
-    return clampPoint(customPositions[key] || defaultPositions.get(key) || { x: GRAPH_BOUNDS.left, y: GRAPH_BOUNDS.top });
+    return customPositions[key] || defaultPositions.get(key) || { x: 0, y: 0 };
   };
 
   const primaryTransactions = new Set(primaryPath?.transaction_hashes || []);
@@ -182,7 +164,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   const edgeFactors = (item: Edge) => risk?.factors.filter(factor => factor.transaction_hashes.includes(item.transaction_hash)) || [];
   const pathRisk = useMemo(() => calculatePathRisk(primaryPath, trace, risk), [primaryPath, trace, risk]);
   const selectedEdgeFactors = (item: Edge) => pathRisk.edgeFactors[item.edge_id] || [];
-  const nodeFactors = (item: Node) => risk?.factors.filter(factor => factor.transaction_hashes.some(tx => trace.edges.some(itemEdge => itemEdge.transaction_hash === tx && (itemEdge.source === item.address || itemEdge.target === item.address) && (!primaryNodes.has(item.address.toLowerCase()) || primaryTransactions.has(tx))))) || [];
+  const nodeFactors = (item: Node) => risk?.factors.filter(factor => factor.transaction_hashes.some(tx => trace.edges.some(itemEdge => itemEdge.transaction_hash === tx && (itemEdge.source === item.address || itemEdge.target === item.address)))) || [];
 
   const handleMouseDownSvg = (e: React.MouseEvent<SVGSVGElement>) => {
     if ((e.target as SVGElement).tagName === 'svg' || (e.target as SVGElement).className === 'graph-grid-lines') {
@@ -203,10 +185,9 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
       // Translate mouse coordinates to SVG coordinate system
       const x = ((e.clientX - rect.left) - pan.x) / scale;
       const y = ((e.clientY - rect.top) - pan.y) / scale;
-      const nextPoint = clampPoint({ x, y });
       setCustomPositions(prev => ({
         ...prev,
-        [draggingNode.id]: nextPoint
+        [draggingNode.id]: { x, y }
       }));
     }
   };
@@ -330,7 +311,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
         <button className="secondary" onClick={() => { setAsset('ALL'); setFlaggedOnly(false); setScale(1); setPan({ x: 0, y: 0 }); setSelectedNode(null); setSelectedEdge(null); }}>RESET VIEW</button>
       </div>
 
-      <PrimaryPathSummary primaryPath={primaryPath} pathRisk={pathRisk} trace={trace} />
+      <PrimaryPathSummary primaryPath={primaryPath} pathRisk={pathRisk} />
 
       <div className="graph-main-grid">
         <section className="graph-surface" aria-label="Observed blockchain transaction graph">
@@ -366,20 +347,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                 style={{ cursor: isPanning ? 'grabbing' : 'grab', width: '100%', height: '100%' }}
               >
                 <defs>
-                  <marker id="graph-arrow-default" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
+                  <marker id="graph-arrow" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
                     <path d="M0,0 L7,3.5 L0,7 Z" fill="#4b5563" />
-                  </marker>
-                  <marker id="graph-arrow-primary" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
-                    <path d="M0,0 L7,3.5 L0,7 Z" fill="#3b82f6" />
-                  </marker>
-                  <marker id="graph-arrow-flagged" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
-                    <path d="M0,0 L7,3.5 L0,7 Z" fill="#f59e0b" />
-                  </marker>
-                  <marker id="graph-arrow-selected" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
-                    <path d="M0,0 L7,3.5 L0,7 Z" fill="#60a5fa" />
-                  </marker>
-                  <marker id="graph-arrow-risk" markerWidth="7" markerHeight="7" refX="24" refY="3.5" orient="auto">
-                    <path d="M0,0 L7,3.5 L0,7 Z" fill="#ff8a65" />
                   </marker>
                 </defs>
                 
@@ -393,22 +362,11 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                   {visibleEdges.map(item => {
                     const source = point(item.source, item.transfer.chain);
                     const target = point(item.target, item.transfer.chain);
+                    const bearing = riskTransactions.has(item.transaction_hash);
                     const isPrimary = primaryEdges.size ? primaryEdges.has(item.edge_id) : primaryTransactions.has(item.transaction_hash);
                     const isPathRisk = selectedEdgeFactors(item).length > 0;
-                    const bearing = riskTransactions.has(item.transaction_hash) || isPathRisk;
                     const selected = selectedEdge?.edge_id === item.edge_id;
                     const token = item.transfer.transfer_type !== 'native';
-                    
-                    const arrowMarker = isPathRisk 
-                      ? 'url(#graph-arrow-risk)' 
-                      : isPrimary 
-                      ? 'url(#graph-arrow-primary)' 
-                      : selected 
-                      ? 'url(#graph-arrow-selected)' 
-                      : bearing 
-                      ? 'url(#graph-arrow-flagged)' 
-                      : 'url(#graph-arrow-default)';
-
                     return (
                       <g 
                         key={item.edge_id} 
@@ -421,9 +379,9 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                         {bearing && (
                           <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke="#f59e0b" strokeWidth={5.5} opacity={0.6} strokeLinecap="round" strokeDasharray="3 3" />
                         )}
-                        <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} markerEnd={arrowMarker} stroke={isPathRisk ? '#ff8a65' : isPrimary ? '#3b82f6' : selected ? '#60a5fa' : bearing ? '#f59e0b' : '#4b5563'} strokeWidth={isPrimary ? 5 : selected ? 3 : bearing ? 3.5 : 1.5} opacity={isPrimary || bearing || isPathRisk ? 1 : 0.45} />
+                        <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} markerEnd="url(#graph-arrow)" stroke={isPathRisk ? '#ff8a65' : isPrimary ? '#4de1c1' : selected ? '#3b82f6' : bearing ? '#f59e0b' : '#4b5563'} strokeWidth={isPrimary ? 5 : selected ? 3 : bearing ? 3.5 : 1.5} opacity={isPrimary || bearing ? 1 : 0.45} />
                         <rect x={(source.x + target.x) / 2 - 40} y={(source.y + target.y) / 2 - 10} width="80" height="20" rx="3" fill="#111827" stroke="#374151" strokeWidth="1" />
-                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 4} textAnchor="middle" fill={isPrimary ? '#93c5fd' : bearing ? '#fef3c7' : '#9ca3af'} fontSize="10">{isPrimary ? `H${item.hop} ` : ''}{formatAmount(item.transfer.amount)} {item.transfer.asset}</text>
+                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 4} textAnchor="middle" fill={isPrimary ? '#b8fff0' : bearing ? '#fef3c7' : '#9ca3af'} fontSize="10">{isPrimary ? `H${item.hop} ` : ''}{formatAmount(item.transfer.amount)} {item.transfer.asset}</text>
                       </g>
                     );
                   })}
@@ -435,11 +393,6 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                     const isContract = item.node_type === 'CONTRACT';
                     const isPrimaryNode = primaryNodes.has(item.address.toLowerCase());
                     const isTerminal = primaryPath?.status === 'ATTRIBUTED' && primaryPath.terminal_address?.toLowerCase() === item.address.toLowerCase();
-                    
-                    const isSuspect = isRoot;
-                    const isExchange = item.node_type === 'VASP' || item.node_type === 'EXCHANGE' || isTerminal;
-                    const isMixer = item.node_type === 'MIXER' || isContract;
-                    
                     const nodeRisk = nodeFactors(item).length > 0;
                     const selected = selectedNode ? identity(selectedNode.chain, selectedNode.address) === identity(item.chain, item.address) : false;
                     const isCollapsed = collapsedNodes.has(item.address);
@@ -462,115 +415,29 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                         }}
                         onClick={() => { setSelectedNode(item); setSelectedEdge(null); }}
                       >
-                        {/* Gold dashed outer border for flagged pattern participants */}
-                        {nodeRisk && (
-                          isExchange ? (
-                            <rect x="-31" y="-31" width="62" height="62" rx="12" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="3 3" />
-                          ) : (
-                            <circle r="31" fill="none" stroke="#fbbf24" strokeWidth="2.5" strokeDasharray="3 3" />
-                          )
-                        )}
-                        
-                        {/* Main shape body */}
-                        {isExchange ? (
-                          <rect x="-25" y="-25" width="50" height="50" rx="8" fill="#10b981" stroke={selected ? '#3b82f6' : '#1f2937'} strokeWidth={selected ? 3.5 : 1.5} />
-                        ) : (
-                          <circle r="25" fill={isSuspect ? '#ef4444' : isMixer ? '#8b5cf6' : '#f97316'} stroke={selected ? '#3b82f6' : '#1f2937'} strokeWidth={selected ? 3.5 : 1.5} />
-                        )}
-                        
-                        {/* Node identifier text label below the node */}
-                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="600">
-                          {isTerminal ? primaryPath?.terminal_entity_name : short(item.address)}
-                        </text>
+                        <circle r={isRoot ? 32 : 26} fill={isRoot ? '#1e3a8a' : isCollapsed ? '#5b21b6' : isContract ? '#065f46' : '#1f2937'} stroke={selected ? '#3b82f6' : nodeRisk ? '#ef4444' : '#4b5563'} strokeWidth="2" />
+                        <circle className="node-core" r={isRoot ? 24 : 18} fill="#0f172a" />
+                        <text className="node-type" textAnchor="middle" y="4" fill="#e5e7eb" fontSize="8" fontWeight="bold">{isRoot ? 'ROOT' : isTerminal ? primaryPath?.terminal_entity_type : isContract ? 'CONTRACT' : 'WALLET'}</text>
+                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="500">{isTerminal ? primaryPath?.terminal_entity_name : short(item.address)}</text>
                       </g>
                     );
                   })}
                 </g>
               </svg>
-              
-              {/* Stats overlay badge top-left */}
-              <div className="graph-stats-overlay" style={{
-                position: 'absolute',
-                top: '15px',
-                left: '15px',
-                background: 'rgba(11, 15, 25, 0.9)',
-                border: '1px solid #1f2937',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                fontSize: '12px',
-                fontWeight: '600',
-                color: '#9ca3af',
-                pointerEvents: 'none',
-                zIndex: 10
-              }}>
-                <span style={{ color: '#f3f4f6', fontWeight: 'bold' }}>{visibleEdges.length} transfers</span> · <span>{visibleNodes.length} wallets</span>{primaryPath?.hops ? <span> · <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{primaryPath.hops}-hop VASP path</span></span> : null}
-              </div>
-
-              {/* Floating Action Buttons top-right */}
-              <div className="graph-actions-overlay" style={{
-                position: 'absolute',
-                top: '15px',
-                right: '15px',
-                display: 'flex',
-                gap: '8px',
-                zIndex: 10
-              }}>
-                <button className="secondary" onClick={fitToGraph} style={{ background: '#111827', border: '1px solid #1f2937', color: '#cbd5e1', fontSize: '11px', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Fit graph</button>
-                <button className="secondary" onClick={centerOnRoot} style={{ background: '#111827', border: '1px solid #1f2937', color: '#cbd5e1', fontSize: '11px', padding: '6px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Center suspect</button>
-              </div>
-
-              {/* Floating Cybersecurity Legend box bottom-left */}
-              <div className="graph-legend-overlay" style={{
-                position: 'absolute',
-                bottom: '15px',
-                left: '15px',
-                background: 'rgba(11, 15, 25, 0.9)',
-                border: '1px solid #1f2937',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                fontSize: '11px',
-                color: '#cbd5e1',
-                pointerEvents: 'none',
-                zIndex: 10
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
-                  <span>Suspect wallet</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f97316', display: 'inline-block' }} />
-                  <span>Unidentified intermediary</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: '#10b981', display: 'inline-block' }} />
-                  <span>Known exchange</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#8b5cf6', display: 'inline-block' }} />
-                  <span>Known mixer</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '20px', height: '3px', background: '#3b82f6', display: 'inline-block' }} />
-                  <span>Likely VASP path</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', height: '12px', borderRadius: '50%', border: '1.5px dashed #fbbf24', display: 'inline-block' }} />
-                  <span>Flagged pattern participant</span>
-                </div>
-              </div>
             </div>
           )}
-          <div className="graph-surface-footer" style={{ padding: '8px 12px', background: '#0b0f19', borderTop: '1px solid #1f2937', fontSize: '11px', color: '#64748b' }}>
-            <span className="footer-note">Double-click downstream nodes to toggle branch visibility. Drag wallets to organize layout. Click transaction cards for evidence details.</span>
+          <div className="graph-surface-footer">
+            <span><i className="legend-root" />Root</span>
+            <span><i className="legend-wallet" />Wallet</span>
+            <span><i className="legend-contract" />Contract</span>
+            <span><i className="legend-risk" />Risk linked</span>
+            <span className="footer-note">Double-click a node to toggle branch visibility. Drag to move.</span>
           </div>
         </section>
         
         <aside className="graph-inspector-panel" aria-live="polite">
           {selectedNode ? (
-            <NodeIntelligencePanel node={selectedNode} trace={trace} factors={nodeFactors(selectedNode)} onCollapse={toggleCollapse} isCollapsed={collapsedNodes.has(selectedNode.address)} isTerminal={primaryPath?.status === 'ATTRIBUTED' && primaryPath.terminal_address?.toLowerCase() === selectedNode.address.toLowerCase()} terminalName={primaryPath?.terminal_entity_name} terminalType={primaryPath?.terminal_entity_type} />
+            <NodeIntelligencePanel node={selectedNode} trace={trace} factors={nodeFactors(selectedNode)} onCollapse={toggleCollapse} isCollapsed={collapsedNodes.has(selectedNode.address)} />
           ) : selectedEdge ? (
             <TransactionIntelligencePanel edge={selectedEdge} factors={selectedEdgeFactors(selectedEdge).length ? selectedEdgeFactors(selectedEdge) : edgeFactors(selectedEdge)} />
           ) : (
@@ -592,7 +459,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   );
 }
 
-function NodeIntelligencePanel({ node, trace, factors, onCollapse, isCollapsed, isTerminal, terminalName, terminalType }: { node: Node; trace: Trace; factors: RiskAssessment['factors']; onCollapse: (addr: string) => void; isCollapsed: boolean; isTerminal: boolean; terminalName?: string; terminalType?: string }) {
+function NodeIntelligencePanel({ node, trace, factors, onCollapse, isCollapsed }: { node: Node; trace: Trace; factors: RiskAssessment['factors']; onCollapse: (addr: string) => void; isCollapsed: boolean }) {
   const [copied, setCopied] = useState(false);
   const [attributions, setAttributions] = useState<any>(null);
 
@@ -629,7 +496,7 @@ function NodeIntelligencePanel({ node, trace, factors, onCollapse, isCollapsed, 
 
   return (
     <div className="intelligence-panel">
-      <InspectorHeading eyebrow={isTerminal ? 'ATTRIBUTED VASP ENDPOINT' : 'NODE INTELLIGENCE'} title={isTerminal ? (terminalName || short(node.address)) : short(node.address)} badge={isTerminal ? (terminalType || 'VASP') : (node.node_type || 'WALLET')} />
+      <InspectorHeading eyebrow="NODE INTELLIGENCE" title={short(node.address)} badge={node.node_type || 'WALLET'} />
       
       <div className="panel-address-copy">
         <code className="address-display">{node.address}</code>
@@ -644,7 +511,7 @@ function NodeIntelligencePanel({ node, trace, factors, onCollapse, isCollapsed, 
         <dd>{(node.chain || 'ethereum').toUpperCase()}</dd>
         
         <dt>TYPE</dt>
-        <dd>{isTerminal ? (terminalType || 'VASP') : (node.node_type || 'WALLET')}</dd>
+        <dd>{node.node_type || 'WALLET'}</dd>
 
         <dt>VOLUME & FLOW</dt>
         <dd className="stats-box">
@@ -656,8 +523,8 @@ function NodeIntelligencePanel({ node, trace, factors, onCollapse, isCollapsed, 
         <dd>
           {factors.length > 0 ? (
             factors.map(item => (
-              <span className="factor-chip risk-high" key={item.factor_id} title={item.explanation}>
-                <strong>{item.name} (+{item.contribution})</strong><small>{item.explanation}</small><small>{item.evidence_ids.length ? `Evidence: ${item.evidence_ids.join(', ')}` : 'Evidence reference unavailable'}</small>
+              <span className="factor-chip risk-high" key={item.factor_id}>
+                {item.name} (+{item.contribution})
               </span>
             ))
           ) : (
@@ -740,7 +607,7 @@ function TransactionIntelligencePanel({ edge, factors }: { edge: Edge; factors: 
         <dd>
           {factors.length > 0 ? (
             factors.map(item => (
-              <span className="factor-chip risk-high" key={item.factor_id} title={item.explanation}><strong>{item.name} (+{item.contribution})</strong><small>{item.explanation}</small><small>{item.evidence_ids.length ? `Evidence: ${item.evidence_ids.join(', ')}` : 'Evidence reference unavailable'}</small></span>
+              <span className="factor-chip risk-high" key={item.factor_id}>{item.name} (+{item.contribution})</span>
             ))
           ) : (
             <span className="attribution-none">No active overlays</span>
@@ -779,7 +646,7 @@ function GraphAnalysisRail({ trace, edges, primaryPath, pathRisk }: { trace: Tra
       <div className="primary-path-panel">
         <div className="eyebrow">PRIMARY INVESTIGATIVE PATH</div>
         <div className="primary-path-chain">{primaryPath?.node_ids?.length ? primaryPath.node_ids.map((address, index) => <React.Fragment key={`${address}-${index}`}><span>{primaryPath.status === 'ATTRIBUTED' && index === primaryPath.node_ids.length - 1 ? primaryPath.terminal_entity_name : index === 0 ? 'ROOT WALLET' : `HOP ${index}`}</span>{index < primaryPath.node_ids.length - 1 && <b>→</b>}</React.Fragment>) : <span>Path unavailable</span>}</div>
-        <div className="primary-path-facts"><div><small>OBSERVED TERMINAL ADDRESS</small><b className="mono">{primaryPath?.terminal_address || 'UNKNOWN'}</b></div><div><small>ATTRIBUTED VASP ENDPOINT</small><b>{primaryPath?.status === 'ATTRIBUTED' ? primaryPath.terminal_entity_name : 'UNKNOWN / UNATTRIBUTED'}</b></div><div><small>TYPE</small><b>{primaryPath?.terminal_entity_type || 'UNKNOWN'}</b></div><div><small>HOPS / TRANSACTIONS</small><b>{primaryPath?.hops ?? 0} / {primaryPath?.transaction_count ?? primaryPath?.transaction_hashes?.length ?? 0}</b></div><div><small>ATTRIBUTION</small><b>{primaryPath?.attribution || 'UNKNOWN'}</b></div><div><small>TOTAL / DURATION</small><b>{primaryPath?.total_transferred_value || pathTotalValue(primaryPath, trace)} / {formatDuration(primaryPath?.path_duration_seconds)}</b></div></div>
+        <div className="primary-path-facts"><div><small>OBSERVED TERMINAL ADDRESS</small><b className="mono">{primaryPath?.terminal_address || 'UNKNOWN'}</b></div><div><small>ATTRIBUTED VASP ENDPOINT</small><b>{primaryPath?.status === 'ATTRIBUTED' ? primaryPath.terminal_entity_name : 'UNKNOWN / UNATTRIBUTED'}</b></div><div><small>TYPE</small><b>{primaryPath?.terminal_entity_type || 'UNKNOWN'}</b></div><div><small>HOPS / TRANSACTIONS</small><b>{primaryPath?.hops ?? 0} / {primaryPath?.transaction_count ?? primaryPath?.transaction_hashes?.length ?? 0}</b></div><div><small>ATTRIBUTION</small><b>{primaryPath?.attribution || 'UNKNOWN'}</b></div><div><small>TOTAL / DURATION</small><b>{primaryPath?.total_transferred_value || 'UNKNOWN'} / {formatDuration(primaryPath?.path_duration_seconds)}</b></div></div>
         <div className="primary-path-why"><small>WHY THIS ENDPOINT</small><span>{primaryPath?.why || 'Primary path calculation unavailable.'}</span></div>
         <div className="primary-path-why"><small>EVIDENCE</small><span>{primaryPath?.transaction_hashes?.length ? primaryPath.transaction_hashes.map(short).join(' | ') : 'No linked transaction evidence'}</span></div>
         <div className="primary-path-risk"><small>SELECTED PATH RISK</small><strong className={`risk-level-${pathRisk.level.toLowerCase()}`}>{pathRisk.score.toFixed(1)} / 100 · {pathRisk.level}</strong><span>{pathRisk.factors.length ? pathRisk.factors.map(item => `${item.name}: ${item.explanation}`).join(' | ') : 'No path-linked risk factors. Observed transfers remain separate from risk overlays.'}</span></div>
@@ -823,7 +690,7 @@ function GraphAnalysisRail({ trace, edges, primaryPath, pathRisk }: { trace: Tra
   );
 }
 
-function PrimaryPathSummary({ primaryPath, pathRisk, trace }: { primaryPath: PrimaryPath | null; pathRisk: PathRisk; trace: Trace }) {
+function PrimaryPathSummary({ primaryPath, pathRisk }: { primaryPath: PrimaryPath | null; pathRisk: PathRisk }) {
   const path = primaryPath?.node_ids?.length
     ? primaryPath.node_ids.map((address, index) => primaryPath.status === 'ATTRIBUTED' && index === primaryPath.node_ids.length - 1
       ? primaryPath.terminal_entity_name
@@ -832,21 +699,9 @@ function PrimaryPathSummary({ primaryPath, pathRisk, trace }: { primaryPath: Pri
   return (
     <section className="graph-primary-summary" aria-label="Primary investigation path summary">
       <div><span className="eyebrow">PRIMARY INVESTIGATION PATH</span><strong>{path.join(' → ')}</strong></div>
-      <span>{primaryPath?.hops ?? 0} hops | {primaryPath?.transaction_count ?? primaryPath?.transaction_hashes?.length ?? 0} transactions | {primaryPath?.total_transferred_value || pathTotalValue(primaryPath, trace)} | RISK {pathRisk.score.toFixed(1)} / 100 · {pathRisk.level}</span>
+      <span>{primaryPath?.hops ?? 0} hops | {primaryPath?.transaction_count ?? primaryPath?.transaction_hashes?.length ?? 0} transactions | {primaryPath?.total_transferred_value || 'UNKNOWN'} | RISK {pathRisk.score.toFixed(1)} / 100 · {pathRisk.level}</span>
     </section>
   );
-}
-
-function pathTotalValue(primaryPath: PrimaryPath | null, trace: Trace): string {
-  const ids = new Set(primaryPath?.edge_ids || []);
-  const hashes = new Set(primaryPath?.transaction_hashes || []);
-  const edges = trace.edges.filter(edge => ids.size ? ids.has(edge.edge_id) : hashes.has(edge.transaction_hash));
-  const totals = new Map<string, number>();
-  for (const edge of edges) {
-    const amount = Number(edge.transfer.amount);
-    if (Number.isFinite(amount)) totals.set(edge.transfer.asset, (totals.get(edge.transfer.asset) || 0) + amount);
-  }
-  return totals.size ? [...totals.entries()].map(([asset, amount]) => `${formatAmount(String(amount))} ${asset}`).join(' + ') : 'UNKNOWN';
 }
 
 type PathRisk = { score: number; level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; factors: RiskAssessment['factors']; edgeFactors: Record<string, RiskAssessment['factors']> };
@@ -856,10 +711,9 @@ function calculatePathRisk(primaryPath: PrimaryPath | null, trace: Trace, assess
   const selectedEdges = new Set(primaryPath?.edge_ids || []);
   const factors = (assessment?.factors || []).filter(factor => factor.transaction_hashes.some(tx => selectedTx.has(tx)));
   const edgeFactors: Record<string, RiskAssessment['factors']> = {};
-  const lastSelectedEdge = trace.edges.filter(edge => selectedEdges.size ? selectedEdges.has(edge.edge_id) : selectedTx.has(edge.transaction_hash)).slice(-1)[0]?.edge_id;
   for (const edge of trace.edges) {
     if ((selectedEdges.size && !selectedEdges.has(edge.edge_id)) || (!selectedEdges.size && !selectedTx.has(edge.transaction_hash))) continue;
-    edgeFactors[edge.edge_id] = factors.filter(factor => factor.transaction_hashes.includes(edge.transaction_hash) || (factor.definition_id === 'graph:hop_depth' && edge.edge_id === lastSelectedEdge));
+    edgeFactors[edge.edge_id] = factors.filter(factor => factor.transaction_hashes.includes(edge.transaction_hash));
   }
   const score = Math.round(Math.min(100, factors.reduce((sum, factor) => sum + factor.contribution, 0) * 100 / 156) * 10) / 10;
   const level = score >= 75 ? 'CRITICAL' : score >= 50 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW';

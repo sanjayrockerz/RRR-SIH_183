@@ -378,7 +378,7 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                 acquisition=trace_run["acquisition"] if trace_run else None,
                 trace_mode=trace_run["mode"] if trace_run else DataMode.HISTORICAL,
                 trace_provider=trace_run["provider"] if trace_run else "Persisted provider observation"
-            ) if edge_rows or evidence_rows else None
+            ) if edge_rows or evidence_rows or trace_run else None
             return InvestigationCase(case_id=str(row["case_id"]),title=row["title"],fraud_type=row["fraud_type"],priority=row["priority"],status=row["status"],created_at=row["created_at"],updated_at=row["updated_at"],external_case_reference=row.get("external_case_id"),description=row.get("description"),created_by=row.get("created_by"),closed_at=row.get("closed_at"),workflow_stage=row.get("workflow_stage") or CaseWorkflowStage.NEW, wallets=[WalletCreate(address=r["address"],chain=r["chain"]) for r in wallet_rows],transactions=[TransactionCreate(tx_hash=r["tx_hash"],chain=r["chain"]) for r in tx_rows],latest_trace=latest_trace)
         except ValueError: return None
         except asyncpg.PostgresError as exc: raise DatabaseError("Case could not be retrieved") from exc
