@@ -154,7 +154,12 @@ export default function App() {
     try {
       // Summary is the authoritative persisted snapshot for the workspace.
       // Load it before rendering any case section so counts never default to 0.
-      const summaryData = await api.summary(caseId);
+      // Summary is auxiliary dashboard data. Do not prevent the authoritative
+      // case and graph from opening when its aggregate query is slow.
+      const summaryData = await api.summary(caseId).catch(err => {
+        console.warn('[RRR] CASE SUMMARY failed (non-fatal):', err instanceof Error ? err.message : err);
+        return null;
+      });
       const loaded = await api.getCase(caseId);
       setCaseData(loaded);
       const loadedGraph = loaded.latest_trace ? await api.graph(caseId) : null;
@@ -163,7 +168,8 @@ export default function App() {
       log(`CASE LOADED title="${loaded.title}" has_trace=${!!loaded.latest_trace}`);
       try {
         const stateData = await api.operationalState(caseId);
-        setOpState({ ...stateData, summary: summaryData });
+        if (summaryData) setOpState({ ...stateData, summary: summaryData });
+        else setOpState(stateData);
         log(`CASE OPERATIONAL STATE loaded stages=${stateData.stages?.length ?? 0}`);
       } catch (err) {
         console.warn('[RRR] CASE OPERATIONAL STATE failed (non-fatal):', err instanceof Error ? err.message : err);

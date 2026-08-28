@@ -138,12 +138,12 @@ class CrossChainGraphBuilder:
                 if next_cross>limits.max_cross_chain_hops or target in reachable: continue
                 reachable.add(target); queue.append((target,hops+1,next_cross))
         selected_edges=[e for e in edges if e.source_node in reachable and e.destination_node in reachable][:limits.max_edges]
-        selected_nodes=[nodes[n] for n in reachable if n in nodes][:limits.max_nodes]
+        selected_nodes=[nodes[n] for n in sorted(reachable) if n in nodes][:limits.max_nodes]
         chains=list(dict.fromkeys(n.chain for n in selected_nodes)); cross_links=[link for link in links if self.registry.node_id(link.source.chain,link.source.address) in reachable]
         edge_by_pair=defaultdict(list)
         for edge in selected_edges: edge_by_pair[(edge.source_node,edge.destination_node)].append(edge)
         paths=[]
-        for target in reachable:
+        for target in sorted(reachable):
             if target==root: continue
             try: node_path=nx.shortest_path(graph,root,target)
             except nx.NetworkXNoPath: continue
@@ -152,5 +152,6 @@ class CrossChainGraphBuilder:
                 candidates=edge_by_pair.get((source,target_node),[])
                 if candidates: path_edges.append(candidates[0].edge_id)
             paths.append(CrossChainPath(path_id=str(uuid4()),node_ids=node_path,edge_ids=path_edges,chains=list(dict.fromkeys(nodes[n].chain for n in node_path if n in nodes)),confidence=ConfidenceLevel.HIGH if any(e in {x.edge_id for x in selected_edges if x.edge_type=="CROSS_CHAIN_LINK"} for e in path_edges) else ConfidenceLevel.CONFIRMED))
+        paths.sort(key=lambda item: (len(item.edge_ids), tuple(item.edge_ids), tuple(item.node_ids)))
         partial=len(selected_edges)<len(edges) or len(selected_nodes)<len(nodes) or any(link.correlation_level=="UNRESOLVED" for link in cross_links)
         return CrossChainTrace(trace_id=str(uuid4()),case_id="",root=ChainAddress(chain=root_chain,address=root_address),chains_visited=chains,cross_chain_hops=sum(1 for edge in selected_edges if edge.edge_type=="CROSS_CHAIN_LINK"),cross_chain_links=cross_links,nodes=selected_nodes,edges=selected_edges,paths=paths,status="PARTIAL" if partial else "COMPLETED",limitations=["Cross-chain links are inferred and confidence-scored; they are not observed transfers." ] if partial else [],max_hops=limits.max_hops,max_cross_chain_hops=limits.max_cross_chain_hops,max_nodes=limits.max_nodes,max_edges=limits.max_edges,max_bridge_interactions=limits.max_bridge_interactions,max_transactions=limits.max_transactions)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import NAMESPACE_URL, uuid5
 from .domain import Chain, RealtimeEvent, WatchCreate
 
@@ -240,7 +240,8 @@ class SyntheticBlockchainEventEngine:
         source, destination, asset, kind = self._pair(idx)
         amount = self._amount(idx)
         key = f'{self.seed}:{self.scenario}:{self.event_number}'
-        now = datetime.now(timezone.utc)
+        # Keep replayed synthetic evidence stable across reloads.
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=self.event_number)
         return RealtimeEvent(
             event_id=uuid5(NAMESPACE_URL, 'event:' + key).__str__(),
             provider='DEVELOPMENT SYNTHETIC',

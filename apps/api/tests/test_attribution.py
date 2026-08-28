@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
+import pytest
 from app.attribution import AttributionEngine, NearestEntityResolver
 from app.primary_path import select_primary_path
 from app.synthetic_attribution import merge as merge_synthetic_attribution, DEMO_VASP_ADDRESS
+from app.fixture_provider import CANONICAL_WALLETS, DevelopmentFixtureProvider
+from app.services import TraceService
+from app.persistence import PostgresCaseRepository
 from app.domain import *
 
 ROOT="0x"+"a"*40; EXCHANGE="0x"+"b"*40; OTHER="0x"+"c"*40
@@ -72,3 +76,51 @@ def test_development_registry_resolves_synthetic_terminal_only():
     assert primary["terminal_entity_type"] == "VASP"
     assert primary["attribution"] == "HIGH"
     assert primary["terminal_address"] == DEMO_VASP_ADDRESS
+
+def test_primary_path_never_reverses_backward_trace_edges():
+    entities, sources, records = catalog()
+    inbound = edge("1", ROOT, OTHER)
+    trace = TraceResult(case_id="case", trace_id="trace", root_address=OTHER, mode=DataMode.HISTORICAL, provider="fixture", direction=TraceDirection.BACKWARD, nodes=[GraphNode(id=ROOT, address=ROOT, depth=1), GraphNode(id=OTHER, address=OTHER, depth=0)], edges=[inbound], signals=[], evidence=[])
+    primary = select_primary_path(trace, entities, sources, records)
+    assert primary["status"] == "UNATTRIBUTED"
+    assert primary["node_ids"] == [OTHER]
+    assert primary["transaction_hashes"] == []
+
+@pytest.mark.asyncio
+async def test_development_fixture_selects_one_canonical_evidence_path():
+    trace = await TraceService(DevelopmentFixtureProvider()).trace(
+        "fixture",
+        TraceRequest(address=CANONICAL_WALLETS["root"], chain=Chain.ETHEREUM, max_hops=6, max_nodes=100, max_edges=500, max_transactions=500),
+    )
+    entities, sources, records = merge_synthetic_attribution([], [], [])
+    primary = select_primary_path(trace, entities, sources, records)
+    expected = [CANONICAL_WALLETS[key] for key in ("root", "hop1", "hop2", "hop3", "hop4", "hop5", "terminal")]
+    assert primary["node_ids"] == expected
+    assert primary["hops"] == len(expected) - 1
+    assert primary["transaction_count"] == len(expected) - 1
+    assert len(set(address.lower() for address in primary["node_ids"])) == len(expected)
+    by_hash = {edge.transaction_hash: edge for edge in trace.edges}
+    selected = [by_hash[tx_hash] for tx_hash in primary["transaction_hashes"]]
+    assert all(edge.source.lower() == expected[index].lower() and edge.target.lower() == expected[index + 1].lower() for index, edge in enumerate(selected))
+    assert all(selected[index].transfer.timestamp <= selected[index + 1].transfer.timestamp for index in range(len(selected) - 1))
+    assert [edge.transfer.amount for edge in selected] == ["0.7500", "1.1600", "1.9800", "0.7500", "1.1600", "1.9800"]
+    assert [edge.transfer.asset for edge in selected] == ["ETH"] * 6
+    assert primary["terminal_entity_name"] == "Demo Exchange"
+    assert primary["terminal_entity_type"] == "VASP"
+    assert select_primary_path(trace, entities, sources, records)["node_ids"] == primary["node_ids"]
+
+def test_persisted_trace_root_comes_from_reported_wallet_not_edge_order():
+    repository = PostgresCaseRepository()
+    reported = "0x" + "a" * 40
+    first_edge_source = "0x" + "c" * 40
+    row = {
+        "source_wallet": first_edge_source, "destination_wallet": "0x" + "d" * 40,
+        "chain": Chain.ETHEREUM, "tx_hash": "0x" + "1" * 64, "block_number": 1,
+        "timestamp": datetime(2026, 1, 1, tzinfo=timezone.utc), "from_address": first_edge_source,
+        "to_address": "0x" + "d" * 40, "native_value": 1.0, "fee": None,
+        "provider": "fixture", "raw_reference": {}, "transfer_raw_reference": {},
+        "transfer_type": "native", "contract_address": None, "token_id": None,
+        "decimals": None, "asset": "ETH", "amount": "1", "hop": 2,
+    }
+    trace = repository._trace_from_rows("case", [{"address": reported}], [row], [])
+    assert trace.root_address == reported

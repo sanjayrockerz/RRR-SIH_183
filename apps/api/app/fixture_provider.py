@@ -7,9 +7,21 @@ FIXTURE_WALLETS = {
     "a": "0x1111111111111111111111111111111111111111",
     "b": "0x2222222222222222222222222222222222222222",
     "c": "0x3333333333333333333333333333333333333333",
-    "d": "0x4444444444444444444444444444444444444444",
+    "d": "0x6666666666666666666666666666666666666666",
     "e": "0x5555555555555555555555555555555555555555",
+    "service": "0x8888888888888888888888888888888888888888",
     "dex": "0x9999999999999999999999999999999999999999",
+}
+
+# Stable development-only addresses for the canonical investigation route.
+CANONICAL_WALLETS = {
+    "root": FIXTURE_WALLETS["a"],
+    "hop1": "0x099c9000000000000000000000000000be211200",
+    "hop2": "0x51eea2000000000000000000000000f6fe480000",
+    "hop3": "0xad6cb2000000000000000000000000b80dfd0000",
+    "hop4": "0x132400000000000000000000000000ede8080000",
+    "hop5": "0x4444444444444444444444444444444444444444",
+    "terminal": FIXTURE_WALLETS["dex"],
 }
 
 def derive_address(base_addr: str, salt: str) -> str:
@@ -27,15 +39,33 @@ class DevelopmentFixtureProvider(BlockchainDataFabric):
         t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
         def tx(n, source, destination, asset="ETH", amount="1", kind="native", contract=None, minutes=0):
             return Transfer(tx_hash="0x" + f"{n:064x}", chain=Chain.ETHEREUM, block_number=21000000+n, timestamp=t0+timedelta(minutes=minutes), source=source, destination=destination, asset=asset, amount=amount, value_native=float(amount) if kind == "native" else None, provider=self.name, transfer_type=kind, contract_address=contract, raw_reference={"fixture_id": n, "source_mode": "DEVELOPMENT_FIXTURE"})
-        a,b,c,d,e,x = (FIXTURE_WALLETS[k] for k in ("a","b","c","d","e","dex"))
-        return [tx(1,a,b,amount="10",minutes=1), tx(2,b,c,amount="8",minutes=3), tx(3,c,d,amount="7",minutes=5), tx(4,a,c,amount="2",minutes=2), tx(5,a,d,amount="1",minutes=2), tx(6,d,e,amount="6",minutes=7), tx(7,c,x,asset="USDC",amount="100",kind="erc20",contract="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",minutes=6), tx(8,x,d,asset="USDC",amount="95",kind="erc20",contract="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",minutes=8)]
+        a,b,c,d,e,x = (FIXTURE_WALLETS[k] for k in ("a","b","c","d","e","service"))
+        observed = [
+            tx(1,a,b,amount="10",minutes=1), tx(2,b,c,amount="8",minutes=3),
+            tx(3,c,d,amount="7",minutes=5), tx(4,a,c,amount="2",minutes=2),
+            tx(5,a,d,amount="1",minutes=2), tx(6,d,e,amount="6",minutes=7),
+            tx(7,c,x,asset="USDC",amount="100",kind="erc20",contract="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",minutes=6),
+            tx(8,x,d,asset="USDC",amount="95",kind="erc20",contract="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",minutes=8),
+        ]
+        canonical = [
+            tx(101, CANONICAL_WALLETS["root"], CANONICAL_WALLETS["hop1"], amount="0.7500", minutes=10),
+            tx(102, CANONICAL_WALLETS["hop1"], CANONICAL_WALLETS["hop2"], amount="1.1600", minutes=11),
+            tx(103, CANONICAL_WALLETS["hop2"], CANONICAL_WALLETS["hop3"], amount="1.9800", minutes=12),
+            tx(104, CANONICAL_WALLETS["hop3"], CANONICAL_WALLETS["hop4"], amount="0.7500", minutes=13),
+            tx(105, CANONICAL_WALLETS["hop4"], CANONICAL_WALLETS["hop5"], amount="1.1600", minutes=14),
+            tx(106, CANONICAL_WALLETS["hop5"], CANONICAL_WALLETS["terminal"], amount="1.9800", minutes=15),
+        ]
+        return observed + canonical
 
     async def get_address_transfers(self, address, chain, *, page_size=100, max_pages=10, max_transactions=500):
         if chain != Chain.ETHEREUM: return []
         normalized = address.lower()
         
         # 1. If it's a known fixture wallet, return the static list filters
-        known_wallets = {FIXTURE_WALLETS[k].lower() for k in ("a","b","c","d","e","dex")}
+        known_wallets = {
+            *(FIXTURE_WALLETS[k].lower() for k in ("a","b","c","d","e","service","dex")),
+            *(address.lower() for address in CANONICAL_WALLETS.values()),
+        }
         if normalized in known_wallets:
             return [item for item in self._transfers() if item.source.lower() == normalized or item.destination.lower() == normalized][:max_transactions]
             
