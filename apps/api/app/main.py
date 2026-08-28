@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import logging
-from datetime import datetime, timezone
-from uuid import uuid4
+from datetime import datetime, timezone, timedelta
+from uuid import uuid4, uuid5, NAMESPACE_URL
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -625,6 +625,85 @@ async def generate_synthetic_case(body: SyntheticCaseRequest):
     batch = await synthetic_engine.run_batch(body.event_count)
     integrity = await repo.database_integrity()
     return {**result, "mode":"DEVELOPMENT_SYNTHETIC", "synthetic": {"scenario":body.scenario.upper(),"seed":body.scenario_seed,"requested_events":body.event_count,"processed_events":batch["processed_events"]}, "integrity":integrity, "note":"All generated records are DEVELOPMENT_SYNTHETIC and were normalized, persisted, graph-projected, assessed, evidenced, and placed on the case timeline through the normal realtime pipeline."}
+
+@app.post("/api/v1/dev/hardcoded-cases")
+async def seed_hardcoded_cases():
+    """Seed three repeatable lab cases through the normal persisted realtime pipeline."""
+    presets = [
+        ("MIXER", "MIXER_EXPOSURE", "DEMO-MIXER-CRITICAL", 4),
+        ("BRIDGE", "BRIDGE_MOVEMENT", "DEMO-BRIDGE-HIGH", 4),
+        ("NORMAL", "NORMAL_ACTIVITY", "DEMO-NORMAL-LOW", 3),
+    ]
+    root = SyntheticBlockchainEventEngine.ROOT
+    results = []
+    for label, scenario, reference, count in presets:
+        existing = next(
+            (item for item in await repo.list_cases()
+             if item.external_case_reference == reference),
+            None,
+        )
+        if existing:
+            # A previous interrupted seed may have left an empty case shell.
+            # Repair that shell through the same persisted event pipeline.
+            existing_transactions = await repo.case_transactions(existing.case_id, limit=1)
+            if existing_transactions:
+                results.append({"case_id": existing.case_id, "scenario": scenario, "existing": True})
+                continue
+            case = existing
+        else:
+            case = await repo.create(CaseCreate(
+                title=f"Development {label} Investigation",
+                fraud_type="Blockchain investigation",
+                priority="HIGH",
+                external_case_reference=reference,
+            ))
+
+        routes = {
+            "MIXER_EXPOSURE": [(root, "0x2222222222222222222222222222222222222222", "10.00", "ETH", "WALLET"), ("0x2222222222222222222222222222222222222222", SyntheticBlockchainEventEngine.MIXER, "9.80", "ETH", "MIXER"), (SyntheticBlockchainEventEngine.MIXER, "0x3333333333333333333333333333333333333333", "9.60", "ETH", "WALLET"), ("0x3333333333333333333333333333333333333333", SyntheticBlockchainEventEngine.VASP, "9.40", "ETH", "VASP")],
+            "BRIDGE_MOVEMENT": [("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "2.50", "ETH", "WALLET"), ("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", SyntheticBlockchainEventEngine.BRIDGE, "2.30", "ETH", "BRIDGE"), (SyntheticBlockchainEventEngine.BRIDGE, "0xcccccccccccccccccccccccccccccccccccccccc", "2.30", "ETH", "WALLET"), ("0xcccccccccccccccccccccccccccccccccccccccc", "0xdddddddddddddddddddddddddddddddddddddd", "2.25", "ETH", "WALLET"), ("0xdddddddddddddddddddddddddddddddddddddd", SyntheticBlockchainEventEngine.VASP, "2.10", "ETH", "VASP")],
+            "NORMAL_ACTIVITY": [("0xaaaa000000000000000000000000000000000001", "0xaaaa000000000000000000000000000000000002", "1.00", "ETH", "WALLET"), ("0xaaaa000000000000000000000000000000000002", "0xaaaa000000000000000000000000000000000003", "0.95", "ETH", "WALLET"), ("0xaaaa000000000000000000000000000000000003", SyntheticBlockchainEventEngine.VASP, "0.90", "ETH", "VASP")],
+        }
+        route = routes[scenario]
+        if scenario == "MIXER_EXPOSURE": route[0] = (root, route[0][1], route[0][2], route[0][3], route[0][4])
+        else: await repo.add_wallet(case.case_id, WalletCreate(address=route[0][0], chain=Chain.ETHEREUM))
+        root = route[0][0]
+        base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        graph_edges = []
+        graph_nodes = [GraphNode(id=route[0][0], address=route[0][0], chain=Chain.ETHEREUM, depth=0, node_type="ROOT")]
+        for index, (source, destination, amount, asset, node_type) in enumerate(route):
+            tx_hash = "0x" + uuid5(NAMESPACE_URL, f"cryptotrace:{reference}:{case.case_id}:tx:{index}").hex * 2
+            transfer = Transfer(tx_hash=tx_hash, chain=Chain.ETHEREUM, block_number=23000000 + index, timestamp=base_time + timedelta(minutes=index), source=source, destination=destination, asset=asset, amount=amount, value_native=float(amount), provider="DEVELOPMENT SYNTHETIC", transfer_type="contract" if node_type in {"MIXER", "BRIDGE"} else "native", contract_address=destination if node_type in {"MIXER", "BRIDGE"} else None, raw_reference={"source_mode":"DEVELOPMENT_SYNTHETIC", "scenario_id":scenario, "bridge_protocol":"Development Cross-chain Bridge" if node_type == "BRIDGE" else None, "destination_chain":"tron" if node_type == "BRIDGE" else None})
+            graph_edges.append(GraphEdge(edge_id=f"{tx_hash}:{source}:{destination}", source=source, target=destination, transfer=transfer, hop=index, transaction_hash=tx_hash))
+            graph_nodes.append(GraphNode(id=destination, address=destination, chain=Chain.ETHEREUM, depth=index + 1, node_type=node_type))
+        trace = TraceResult(
+            case_id=case.case_id,
+            trace_id=str(uuid5(NAMESPACE_URL, f"cryptotrace:{reference}:{case.case_id}:trace")),
+            root_address=root,
+            mode=DataMode.DEVELOPMENT_FIXTURE,
+            provider="DEVELOPMENT SYNTHETIC",
+            nodes=graph_nodes, edges=graph_edges, signals=[], evidence=[],
+            limits=TraceLimits(max_hops=6, max_nodes=100, max_edges=500,
+                               max_transactions=500, max_duration=60),
+            metrics=TraceMetrics(),
+        )
+        trace.metrics = TraceMetrics(node_count=len(graph_nodes), edge_count=len(graph_edges), unique_wallet_count=len(graph_nodes), maximum_hop=len(graph_edges), path_count=1, unique_transaction_count=len(graph_edges), unique_asset_count=1)
+        await repo.persist_trace(trace)
+        await graph_projection.project(trace)
+        entities, sources, records = await repo.attribution_catalog()
+        attributions = NearestEntityResolver(AttributionEngine(entities, sources, records)).resolve(trace)
+        await pattern_service.analyze(trace, PatternAnalyzeRequest(trace_id=trace.trace_id), attributions)
+        await risk_service.assess(case.case_id, RiskAssessRequest(trace_id=trace.trace_id))
+        results.append({
+            "case_id": case.case_id,
+            "scenario": scenario,
+            "events": len(graph_edges),
+            "existing": False,
+        })
+    return {
+        "mode": "DEVELOPMENT_SYNTHETIC",
+        "cases": results,
+        "note": "Select any returned case ID in the existing case selector. Each case is persisted and uses one deterministic primary path.",
+    }
 
 @app.get("/api/v1/dev/fixture/status")
 async def development_fixture_status():

@@ -1,13 +1,13 @@
 from __future__ import annotations
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import NAMESPACE_URL, uuid5
 from .domain import Chain, RealtimeEvent, WatchCreate
 
 # Distinct amounts per scenario so value factor fires meaningfully
 _SCENARIO_AMOUNTS: dict[str, list[str]] = {
     # LOW: tiny amounts, no value factor
-    "NORMAL_ACTIVITY":    ["0.0032", "0.0018", "0.0041", "0.0025"],
+    "NORMAL_ACTIVITY":    ["1.00", "0.95", "0.90"],
     # GUARDED: small ETH, no large value
     "VASP_EXPOSURE":      ["0.38", "0.52", "0.29", "0.61"],
     # ELEVATED: moderate ETH, fan-out/fan-in patterns
@@ -16,9 +16,9 @@ _SCENARIO_AMOUNTS: dict[str, list[str]] = {
     # HIGH: peel chain with residual value
     "PEEL_CHAIN":         ["8.00", "7.20", "6.48", "5.83", "5.25", "4.72"],
     # HIGH: mixer exposure — contract interactions
-    "MIXER_EXPOSURE":     ["3.50", "3.50", "3.50", "3.50"],
+    "MIXER_EXPOSURE":     ["10.00", "9.80", "9.60", "9.40"],
     # HIGH: bridge movement — large USDC cross-chain
-    "BRIDGE_MOVEMENT":    ["5000", "5000", "5000", "5000"],
+    "BRIDGE_MOVEMENT":    ["2.50", "2.30", "2.25", "2.10"],
     # CRITICAL: multi-stage fraud — large amounts + all signals
     "MULTI_STAGE_FRAUD":  ["25000", "12500", "12500", "18000", "7000", "7000", "25000", "25000", "800", "800"],
     # CRITICAL: escalation — grows from small to large over cohorts
@@ -26,7 +26,7 @@ _SCENARIO_AMOUNTS: dict[str, list[str]] = {
 }
 
 _SCENARIO_ASSETS: dict[str, list[str]] = {
-    "NORMAL_ACTIVITY":   ["ETH", "ETH", "ETH", "ETH"],
+    "NORMAL_ACTIVITY":   ["ETH", "ETH", "ETH"],
     "VASP_EXPOSURE":     ["ETH", "ETH", "USDC", "ETH"],
     "FAN_OUT":           ["ETH", "ETH", "ETH", "USDC", "ETH"],
     "FAN_IN":            ["ETH", "USDC", "ETH", "ETH", "USDC"],
@@ -59,7 +59,7 @@ class SyntheticBlockchainEventEngine:
     C      = '0x4444444444444444444444444444444444444444'
     VASP   = '0x9999999999999999999999999999999999999999'
     MIXER  = '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'   # synthetic mixer
-    BRIDGE = '0xbr1dgebr1dgebr1dgebr1dgebr1dge00000000'     # synthetic bridge
+    BRIDGE = '0xb' + ('1' * 39)  # synthetic bridge, valid 20-byte Ethereum address
 
     def __init__(self, realtime_service, repository):
         self.realtime_service = realtime_service
@@ -130,7 +130,7 @@ class SyntheticBlockchainEventEngine:
 
         if s == 'NORMAL_ACTIVITY':
             # Simple back-and-forth between root and A — no layering
-            pairs = [(self.ROOT, self.A), (self.A, self.ROOT), (self.ROOT, self.A), (self.A, self.B)]
+            pairs = [(self.ROOT, self.A), (self.A, self.B), (self.B, self.VASP)]
             src, dst = pairs[i % len(pairs)]
             return src, dst, 'ETH', 'NATIVE'
 
@@ -240,7 +240,7 @@ class SyntheticBlockchainEventEngine:
         source, destination, asset, kind = self._pair(idx)
         amount = self._amount(idx)
         key = f'{self.seed}:{self.scenario}:{self.event_number}'
-        now = datetime.now(timezone.utc)
+        now = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=self.event_number)
         return RealtimeEvent(
             event_id=uuid5(NAMESPACE_URL, 'event:' + key).__str__(),
             provider='DEVELOPMENT SYNTHETIC',
@@ -261,6 +261,9 @@ class SyntheticBlockchainEventEngine:
                 'scenario_id': self.scenario,
                 'scenario_seed': self.seed,
                 'expected_risk_band': self._expected_band(),
+                'bridge_protocol': 'Development Cross-chain Bridge' if self.scenario == 'BRIDGE_MOVEMENT' and (source == self.BRIDGE or destination == self.BRIDGE) else None,
+                'source_chain': 'ethereum' if self.scenario == 'BRIDGE_MOVEMENT' else None,
+                'destination_chain': 'tron' if self.scenario == 'BRIDGE_MOVEMENT' and (source == self.BRIDGE or destination == self.BRIDGE) else None,
             },
         )
 

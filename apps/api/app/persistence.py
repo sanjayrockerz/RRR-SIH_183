@@ -377,7 +377,7 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                 acquisition=trace_run["acquisition"] if trace_run else None,
                 trace_mode=trace_run["mode"] if trace_run else DataMode.HISTORICAL,
                 trace_provider=trace_run["provider"] if trace_run else "Persisted provider observation"
-            ) if edge_rows or evidence_rows else None
+            ) if edge_rows or evidence_rows or trace_run else None
             return InvestigationCase(case_id=str(row["case_id"]),title=row["title"],fraud_type=row["fraud_type"],priority=row["priority"],status=row["status"],created_at=row["created_at"],updated_at=row["updated_at"],external_case_reference=row.get("external_case_id"),description=row.get("description"),created_by=row.get("created_by"),closed_at=row.get("closed_at"),workflow_stage=row.get("workflow_stage") or CaseWorkflowStage.NEW, wallets=[WalletCreate(address=r["address"],chain=r["chain"]) for r in wallet_rows],transactions=[TransactionCreate(tx_hash=r["tx_hash"],chain=r["chain"]) for r in tx_rows],latest_trace=latest_trace)
         except ValueError: return None
         except asyncpg.PostgresError as exc: raise DatabaseError("Case could not be retrieved") from exc
@@ -463,9 +463,18 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             transfer=Transfer(tx_hash=row["tx_hash"],chain=row["chain"],block_number=row["block_number"],timestamp=row["timestamp"],source=row["from_address"],destination=row["to_address"],asset=row["asset"],amount=row["amount"],value_native=float(row["native_value"]) if row["native_value"] is not None else None,provider=row["provider"] or raw.get("provider","PostgreSQL"),transfer_type=row["transfer_type"] or "native",contract_address=row["contract_address"] or None,token_id=row["token_id"] or None,decimals=row["decimals"],fee=str(row["fee"]) if row["fee"] is not None else None,raw_reference=transfer_raw)
             edges.append(GraphEdge(edge_id=f"{row['tx_hash']}:{row['source_wallet']}:{row['destination_wallet']}",source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer,hop=row["hop"]))
         evidence=[Evidence(evidence_id=str(r["evidence_id"]),case_id=case_id,type=r["evidence_type"],chain=r["chain"],tx_hash=r["tx_hash"],source=r["source"],captured_at=r["captured_at"],metadata=(json.loads(r["metadata"]) if isinstance(r["metadata"],str) else (r["metadata"] or {})),content_hash=r.get("content_hash"),integrity_status=r.get("integrity_status") or "UNVERIFIED") for r in evidence_rows]
-        root=next(iter(nodes),next((r["address"] for r in wallet_rows),""))
+        reported = next((r["address"] for r in wallet_rows if str(r.get("role", "")).upper() == "REPORTED"), None)
+        root = reported or next((r["address"] for r in wallet_rows), next(iter(nodes), ""))
         acq = AcquisitionStatistics(**self._json_dict(acquisition)) if acquisition else AcquisitionStatistics()
-        return TraceResult(case_id=case_id,trace_id=trace_id,root_address=root,mode=trace_mode,provider=trace_provider,nodes=list(nodes.values()),edges=edges,signals=[],evidence=evidence,metrics=TraceMetrics(node_count=len(nodes),edge_count=len(edges),unique_transaction_count=len({e.transaction_hash for e in edges}),unique_asset_count=len({e.transfer.asset for e in edges})),acquisition=acq,limitations=["Persisted trace results do not re-run analytical rules on read."])
+        metrics = TraceMetrics(node_count=len(nodes), edge_count=len(edges),
+                               unique_wallet_count=len(nodes), maximum_hop=max((e.hop for e in edges), default=0),
+                               path_count=1 if edges else 0,
+                               unique_transaction_count=len({e.transaction_hash for e in edges}),
+                               unique_asset_count=len({e.transfer.asset for e in edges}))
+        ordered = sorted(edges, key=lambda edge: (edge.transfer.timestamp or datetime.min.replace(tzinfo=timezone.utc), edge.transaction_hash))
+        path_nodes = [ordered[0].source] + [edge.target for edge in ordered] if ordered else [root]
+        path = TransactionPath(path_id=f"persisted:{trace_id}", node_ids=path_nodes, edges=ordered) if ordered else None
+        return TraceResult(case_id=case_id,trace_id=trace_id,root_address=root,mode=trace_mode,provider=trace_provider,nodes=list(nodes.values()),edges=edges,signals=[],evidence=evidence,paths=[path] if path else [],metrics=metrics,acquisition=acq,limitations=["Persisted trace results do not re-run analytical rules on read."])
 
     async def list_traces(self, case_id: str) -> list[TraceResult]:
         pool=self._require_pool()
