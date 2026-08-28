@@ -60,7 +60,7 @@ class BridgeDetectionEngine:
             if definition: candidates.append(("BRIDGE_WITHDRAWAL",definition,bridge_address))
             for interaction_type,bridge,contract in candidates:
                 raw=transfer.raw_reference or {}
-                result.append(BridgeInteraction(interaction_id=str(uuid4()),bridge_id=bridge.bridge_id,bridge_name=bridge.name,interaction_type=interaction_type,source_chain=transfer.chain,destination_chain=None,transaction_hash=transfer.tx_hash,bridge_contract=contract,source_address=transfer.source,recipient=transfer.destination if interaction_type=="BRIDGE_DEPOSIT" else transfer.destination,asset=transfer.asset,amount=transfer.amount,timestamp=transfer.timestamp,message_id=raw.get("message_id") or raw.get("messageId"),nonce=str(raw.get("nonce")) if raw.get("nonce") is not None else None,evidence_ids=evidence_by_tx.get(transfer.tx_hash,[]),confidence=ConfidenceLevel.MEDIUM,source=transfer.provider,explanation=f"Observed {interaction_type.lower().replace('_',' ')} involving the source-backed bridge contract {contract}; destination-chain continuation is not established by this observation alone.",raw_reference=raw))
+                result.append(BridgeInteraction(interaction_id=str(uuid4()),bridge_id=bridge.bridge_id,bridge_name=bridge.name,interaction_type=interaction_type,source_chain=transfer.chain,destination_chain=raw.get("destination_chain"),transaction_hash=transfer.tx_hash,bridge_contract=contract,source_address=transfer.source,recipient=raw.get("destination_address") or (transfer.destination if interaction_type=="BRIDGE_DEPOSIT" else transfer.destination),asset=transfer.asset,amount=transfer.amount,timestamp=transfer.timestamp,message_id=raw.get("message_id") or raw.get("messageId"),nonce=str(raw.get("nonce")) if raw.get("nonce") is not None else None,evidence_ids=evidence_by_tx.get(transfer.tx_hash,[]),confidence=ConfidenceLevel.MEDIUM,source=transfer.provider,explanation=f"Observed {interaction_type.lower().replace('_',' ')} involving the source-backed bridge contract {contract}; destination-chain continuation is not established by this observation alone.",raw_reference=raw))
         return result
 
 
@@ -76,11 +76,17 @@ class CrossChainCorrelationEngine:
                 links.append(self._unresolved(interaction)); continue
             best=max(candidates,key=lambda t:self._score(interaction,t))
             score,reasons=self._score(interaction,best,with_reasons=True)
-            level="EXACT" if score>=0.95 else "STRONG" if score>=0.55 else "PROBABLE" if score>=0.35 else "POSSIBLE" if score>0 else "UNRESOLVED"
+            # Asset/timestamp similarity alone is not a defensible cross-chain
+            # link. Require a bridge message, recipient continuity, or equivalent
+            # high-signal source evidence before asserting a destination.
+            level="EXACT" if score>=0.95 else "STRONG" if score>=0.55 else "UNRESOLVED"
             band=ConfidenceLevel.CONFIRMED if level=="EXACT" else ConfidenceLevel.HIGH if level=="STRONG" else ConfidenceLevel.MEDIUM if level=="PROBABLE" else ConfidenceLevel.LOW if level=="POSSIBLE" else ConfidenceLevel.UNKNOWN
+            if level == "UNRESOLVED":
+                links.append(self._unresolved(interaction)); continue
             destination=best.destination
+            destination_evidence=(best.raw_reference or {}).get("evidence_ids", [])
             correlation_id=sha256(f"{interaction.transaction_hash}|{best.tx_hash}|{interaction.bridge_id}".encode()).hexdigest()
-            links.append(CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=ChainAddress(chain=best.chain,address=destination),source_transaction_hash=interaction.transaction_hash,destination_transaction_hash=best.tx_hash,bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level=level,confidence_score=score,confidence_band=band,evidence_count=len(set(interaction.evidence_ids)),correlation_reasons=reasons,evidence_ids=list(dict.fromkeys(interaction.evidence_ids)),provenance_source="CrossChainCorrelationEngine",explanation="Inferred cross-chain relationship; " + ("; ".join(reasons) if reasons else "no qualifying correlation signal"),created_at=datetime.now(timezone.utc)))
+            links.append(CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=ChainAddress(chain=best.chain,address=destination),source_transaction_hash=interaction.transaction_hash,destination_transaction_hash=best.tx_hash,bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level=level,confidence_score=score,confidence_band=band,evidence_count=len(set(interaction.evidence_ids + destination_evidence)),correlation_reasons=reasons,evidence_ids=list(dict.fromkeys(interaction.evidence_ids + destination_evidence)),provenance_source="CrossChainCorrelationEngine",explanation="Inferred cross-chain relationship; " + ("; ".join(reasons) if reasons else "no qualifying correlation signal"),asset=interaction.asset,amount=interaction.amount,timestamp=interaction.timestamp,bridge_protocol=interaction.bridge_name,created_at=datetime.now(timezone.utc)))
         return links
     def _score(self, interaction, transfer, with_reasons=False):
         score=0.0; reasons=[]; raw=transfer.raw_reference or {}
@@ -96,7 +102,7 @@ class CrossChainCorrelationEngine:
         return (score,reasons) if with_reasons else score
     def _unresolved(self, interaction):
         correlation_id=sha256(f"{interaction.transaction_hash}|unresolved|{interaction.bridge_id}".encode()).hexdigest()
-        return CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=None,source_transaction_hash=interaction.transaction_hash,destination_transaction_hash="",bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level="UNRESOLVED",confidence_score=0,confidence_band=ConfidenceLevel.UNKNOWN,evidence_count=len(interaction.evidence_ids),correlation_reasons=[],evidence_ids=interaction.evidence_ids,provenance_source="CrossChainCorrelationEngine",explanation="Bridge interaction observed, but no destination-chain transaction was correlated; no destination address is asserted.",created_at=datetime.now(timezone.utc))
+        return CrossChainLink(link_id=str(uuid5(NAMESPACE_URL,f"rrr:cross-chain:{correlation_id}")),source=ChainAddress(chain=interaction.source_chain,address=interaction.source_address),destination=None,source_transaction_hash=interaction.transaction_hash,destination_transaction_hash="",bridge_id=interaction.bridge_id,correlation_id=correlation_id,correlation_level="UNRESOLVED",confidence_score=0,confidence_band=ConfidenceLevel.UNKNOWN,evidence_count=len(interaction.evidence_ids),correlation_reasons=[],evidence_ids=interaction.evidence_ids,provenance_source="CrossChainCorrelationEngine",explanation="Bridge interaction observed, but no destination-chain transaction was correlated; no destination address is asserted.",asset=interaction.asset,amount=interaction.amount,timestamp=interaction.timestamp,bridge_protocol=interaction.bridge_name,created_at=datetime.now(timezone.utc))
 
 
 class CrossChainGraphBuilder:
@@ -116,8 +122,13 @@ class CrossChainGraphBuilder:
         for link in links[:limits.max_bridge_interactions]:
             if not link.destination: continue
             source=add_node(link.source.chain,link.source.address); target=add_node(link.destination.chain,link.destination.address)
-            edge=CrossChainEdge(edge_id=str(uuid4()),edge_type="CROSS_CHAIN_LINK",source_node=source,destination_node=target,chain=link.source.chain,destination_chain=link.destination.chain,transaction_hash=link.source_transaction_hash,destination_transaction_hash=link.destination_transaction_hash or None,bridge_id=link.bridge_id,link_id=link.link_id,confidence_band=link.confidence_band,evidence_ids=link.evidence_ids,observed_or_inferred="INFERRED",metadata={"correlation_level":link.correlation_level,"reasons":link.correlation_reasons})
-            edges.append(edge); graph.add_edge(source,target,key=edge.edge_id,edge=edge)
+            bridge_id=f"bridge:{link.bridge_id}"
+            if bridge_id not in nodes:
+                nodes[bridge_id]=CrossChainNode(node_id=bridge_id,chain=link.source.chain,address=link.bridge_id,node_type="BRIDGE",metadata={"protocol":link.bridge_id})
+                graph.add_node(bridge_id)
+            deposit=CrossChainEdge(edge_id=str(uuid4()),edge_type="BRIDGE_DEPOSIT",source_node=source,destination_node=bridge_id,chain=link.source.chain,destination_chain=link.destination.chain,transaction_hash=link.source_transaction_hash,asset=link.asset if hasattr(link,"asset") else None,amount=link.amount if hasattr(link,"amount") else None,bridge_id=link.bridge_id,link_id=link.link_id,confidence_band=link.confidence_band,evidence_ids=link.evidence_ids,observed_or_inferred="OBSERVED",metadata={"correlation_level":link.correlation_level,"reasons":link.correlation_reasons})
+            bridge=CrossChainEdge(edge_id=str(uuid4()),edge_type="CROSS_CHAIN_LINK",source_node=bridge_id,destination_node=target,chain=link.source.chain,destination_chain=link.destination.chain,transaction_hash=link.source_transaction_hash,destination_transaction_hash=link.destination_transaction_hash or None,bridge_id=link.bridge_id,link_id=link.link_id,confidence_band=link.confidence_band,evidence_ids=link.evidence_ids,observed_or_inferred="INFERRED",metadata={"correlation_level":link.correlation_level,"reasons":link.correlation_reasons})
+            edges.extend([deposit,bridge]); graph.add_edge(source,bridge_id,key=deposit.edge_id,edge=deposit); graph.add_edge(bridge_id,target,key=bridge.edge_id,edge=bridge)
         root=self.registry.node_id(root_chain,root_address); reachable={root}; queue=deque([(root,0,0)])
         while queue:
             current,hops,cross=queue.popleft()

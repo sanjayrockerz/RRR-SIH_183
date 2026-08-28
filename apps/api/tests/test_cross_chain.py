@@ -62,7 +62,16 @@ def test_cross_chain_graph_preserves_observed_and_inferred_edges():
     graph=CrossChainGraphBuilder().build([observed,withdrawal],[link],Chain.ETHEREUM,ETH_A)
     assert any(node.node_id==f"ethereum:{ETH_A}" for node in graph.nodes)
     assert any(node.node_id==f"tron:{TRON_C}" for node in graph.nodes)
+    assert any(node.node_type=="BRIDGE" for node in graph.nodes)
     assert any(edge.edge_type=="CROSS_CHAIN_LINK" and edge.observed_or_inferred=="INFERRED" for edge in graph.edges)
+
+def test_same_asset_and_time_without_bridge_signal_stays_unknown():
+    definition=BridgeDefinition(bridge_id="bridge.test",name="Fixture Bridge",supported_chains=[Chain.ETHEREUM,Chain.TRON],deposit_contracts={Chain.ETHEREUM:[ETH_BRIDGE]},source="fixture",version="1")
+    t=datetime(2026,1,1,tzinfo=timezone.utc)
+    interaction=BridgeDetectionEngine(BridgeRegistry([definition])).detect([transfer(Chain.ETHEREUM,ETH_A,ETH_BRIDGE,TX1,timestamp=t)])[0].model_copy(update={"destination_chain":Chain.TRON})
+    unrelated=transfer(Chain.TRON,TRON_C,TRON_C,TX2,timestamp=t+timedelta(seconds=20))
+    link=CrossChainCorrelationEngine().correlate([interaction],[unrelated],definition)[0]
+    assert link.destination is None and link.correlation_level=="UNRESOLVED"
 
 
 def test_unresolved_correlation_is_not_promoted_to_fact():

@@ -455,13 +455,13 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
     def _trace_from_rows(self, case_id, wallet_rows, edge_rows, evidence_rows, trace_id="", acquisition=None, trace_mode=DataMode.HISTORICAL, trace_provider="Persisted provider observation"):
         nodes={}; edges=[]
         for row in edge_rows:
-            nodes.setdefault(row["source_wallet"],GraphNode(id=row["source_wallet"],address=row["source_wallet"],depth=row["hop"]))
-            nodes.setdefault(row["destination_wallet"],GraphNode(id=row["destination_wallet"],address=row["destination_wallet"],depth=row["hop"]+1))
+            nodes.setdefault(row["source_wallet"],GraphNode(id=row["source_wallet"],address=row["source_wallet"],chain=row["chain"],depth=row["hop"]))
+            nodes.setdefault(row["destination_wallet"],GraphNode(id=row["destination_wallet"],address=row["destination_wallet"],chain=row["chain"],depth=row["hop"]+1))
             raw=row["raw_reference"] or {}; raw=json.loads(raw) if isinstance(raw,str) else raw
             transfer_raw=row["transfer_raw_reference"] or raw
             transfer_raw=json.loads(transfer_raw) if isinstance(transfer_raw,str) else transfer_raw
             transfer=Transfer(tx_hash=row["tx_hash"],chain=row["chain"],block_number=row["block_number"],timestamp=row["timestamp"],source=row["from_address"],destination=row["to_address"],asset=row["asset"],amount=row["amount"],value_native=float(row["native_value"]) if row["native_value"] is not None else None,provider=raw.get("provider","PostgreSQL"),transfer_type=row["transfer_type"] or "native",contract_address=row["contract_address"] or None,token_id=row["token_id"] or None,decimals=row["decimals"],raw_reference=transfer_raw)
-            edges.append(GraphEdge(source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer))
+            edges.append(GraphEdge(edge_id=f"{row['tx_hash']}:{row['source_wallet']}:{row['destination_wallet']}",source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer,hop=row["hop"]))
         evidence=[Evidence(evidence_id=str(r["evidence_id"]),case_id=case_id,type=r["evidence_type"],chain=r["chain"],tx_hash=r["tx_hash"],source=r["source"],captured_at=r["captured_at"],metadata=(json.loads(r["metadata"]) if isinstance(r["metadata"],str) else (r["metadata"] or {})),content_hash=r.get("content_hash"),integrity_status=r.get("integrity_status") or "UNVERIFIED") for r in evidence_rows]
         root=next(iter(nodes),next((r["address"] for r in wallet_rows),""))
         acq = AcquisitionStatistics(**self._json_dict(acquisition)) if acquisition else AcquisitionStatistics()

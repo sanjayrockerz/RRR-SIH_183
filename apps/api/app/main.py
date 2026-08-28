@@ -27,6 +27,8 @@ from .cyber_intelligence import CuratedSanctionsProvider
 from .alert_service import AlertService
 from .evidence_service import EvidenceService
 from .report_service import ReportService
+from .report_pdf import render_report_pdf
+from .primary_path import select_primary_path
 from .http_security import error_payload, request_id, validation_detail
 from .auth import AuthenticationError, JwtAuthenticator, auth_status
 from .synthetic_realtime import SyntheticBlockchainEventEngine
@@ -48,7 +50,7 @@ async def lifespan(_app: FastAPI):
         await repo.close()
 
 app=FastAPI(title="Crypto Fraud Intelligence API",version="0.1.0",lifespan=lifespan)
-app.add_middleware(CORSMiddleware,allow_origins=list(dict.fromkeys([settings.api_origin,"http://localhost:5173","http://127.0.0.1:5173","http://localhost:4173","http://127.0.0.1:4173"])),allow_methods=["*"],allow_headers=["*"])
+app.add_middleware(CORSMiddleware,allow_origins=settings.cors_origins,allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
@@ -519,6 +521,17 @@ async def case_attributions(case_id: str):
         return NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(case.latest_trace)
     except DatabaseError as exc: return database_failure(exc)
 
+@app.get("/api/v1/cases/{case_id}/primary-path")
+async def case_primary_path(case_id: str):
+    case = await get_case(case_id)
+    if not case.latest_trace:
+        return {"status": "UNATTRIBUTED", "root_address": next((item.address for item in case.wallets), ""), "node_ids": [], "transaction_hashes": [], "hops": 0, "terminal_address": None, "terminal_entity_id": None, "terminal_entity_name": "UNKNOWN / UNATTRIBUTED DESTINATION", "terminal_entity_type": "UNKNOWN", "terminal_role": "UNKNOWN", "attribution": "UNKNOWN", "why": "No persisted trace is available.", "evidence_ids": [], "attribution_records": []}
+    try:
+        entities, sources, records = await repo.attribution_catalog()
+        return select_primary_path(case.latest_trace, entities, sources, records)
+    except DatabaseError as exc:
+        return database_failure(exc)
+
 @app.get("/api/v1/cases/{case_id}/entities", response_model=list[Entity])
 async def case_entities(case_id: str):
     await get_case(case_id)
@@ -794,6 +807,18 @@ async def get_report(case_id: str, report_id: str):
         result = await report_service.get(case_id, report_id)
         if not result: raise HTTPException(404, "Report not found")
         return result
+    except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/reports/{report_id}/pdf")
+async def download_report_pdf(case_id: str, report_id: str):
+    await get_case(case_id)
+    try:
+        result = await report_service.get(case_id, report_id)
+        if not result:
+            raise HTTPException(404, "Report not found")
+        pdf = render_report_pdf(result)
+        filename = f"crypto-fraud-report-{case_id[:8]}-{report_id[:8]}.pdf"
+        return StreamingResponse(iter([pdf]), media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"', "Content-Length": str(len(pdf))})
     except DatabaseError as exc: return database_failure(exc)
 
 @app.post("/api/v1/cases/{case_id}/traces",response_model=TraceResult)

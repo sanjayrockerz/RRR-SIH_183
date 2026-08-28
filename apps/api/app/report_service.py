@@ -25,12 +25,13 @@ class ReportService:
         screenings = await self.repository.case_screenings(case_id)
         risk_history = await self.repository.risk_history(case_id)
         alerts = await self.repository.alerts(case_id)
+        cross_links = await self.repository.cross_chain_links(case_id) if hasattr(self.repository, "cross_chain_links") else []
         
         from .attribution import AttributionEngine, NearestEntityResolver
         entities, sources, records = await self.repository.attribution_catalog()
         nearest = NearestEntityResolver(AttributionEngine(entities, sources, records)).resolve(trace) if trace else []
 
-        report = self._build(case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request)
+        report = self._build(case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links)
         persisted = await self.repository.persist_report(report)
         await self.repository.append_audit_event(AuditEvent(event_id=str(uuid4()), case_id=case_id, action="REPORT_GENERATED", resource_type="REPORT", resource_id=persisted.report_id, actor_id=request.created_by, occurred_at=persisted.created_at, metadata={"report_type": persisted.report_type.value, "evidence_count": len(persisted.evidence_ids)}))
         await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()), case_id=case_id, timestamp=persisted.created_at, event_type="REPORT_GENERATED", summary="Evidence-backed investigation report snapshot generated.", source="ReportService", evidence_ids=persisted.evidence_ids, metadata={"report_id": persisted.report_id, "report_type": persisted.report_type.value}))
@@ -42,7 +43,7 @@ class ReportService:
     async def get(self, case_id: str, report_id: str) -> InvestigationReport | None:
         return await self.repository.get_report(case_id, report_id)
 
-    def _build(self, case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request):
+    def _build(self, case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links=None):
         now = datetime.now(timezone.utc)
         evidence_ids = sorted({item.evidence_id for item in evidence})
         pattern_ids = sorted({item.pattern_id for item in patterns})
@@ -215,12 +216,47 @@ class ReportService:
         else:
             lines.append("   - No active provider tracing history available.")
 
-        lines.extend([
+        cross_lines = ["", "16. CROSS-CHAIN INTELLIGENCE"]
+        if cross_links:
+            for link in cross_links:
+                if link.destination and link.correlation_level in {"EXACT", "STRONG"}:
+                    cross_lines.append(f"   - {link.source.chain.value.upper()} -> {link.bridge_protocol or link.bridge_id} -> {link.destination.chain.value.upper()} | Source TX: {link.source_transaction_hash} | Destination TX: {link.destination_transaction_hash} | Asset: {link.asset or 'UNKNOWN'} | Amount: {link.amount or 'UNKNOWN'} | Confidence: {link.confidence_band} | Evidence: {', '.join(link.evidence_ids) or 'none'}")
+                else:
+                    cross_lines.append("   - CROSS-CHAIN LINK: UNKNOWN - No verified destination-chain correlation was established.")
+        else:
+            cross_lines.append("   - No verified cross-chain correlation was established in this evidence snapshot.")
+        lines.extend(cross_lines + [
             "",
-            "16. LIMITATIONS",
+            "17. LIMITATIONS",
             "   - This report snapshot captures state at the time of generation.",
             "   - Analytical classifications, attributions, and risk assessment are priorities based on rule criteria and do not constitute legal findings.",
             "   - Integrity checks are based on stored content hashes in the Postgres evidence ledger.",
+        ])
+        lines.extend([
+            "",
+            "18. BLOCKCHAIN CYBERSECURITY CONTROL ASSESSMENT",
+            "   - Asset and chain exposure: Record every chain, asset, token contract, bridge, and custody boundary observed in the trace.",
+            "   - Transaction integrity: Validate transaction hash, block context, confirmation state, reorg status, transfer index, and provider provenance before relying on an observation.",
+            "   - Identity and attribution: Treat VASP, exchange, mixer, bridge, contract, and service labels as source-backed intelligence with explicit confidence; do not infer ownership from proximity alone.",
+            "   - Sanctions and AML: Screen reported and materially exposed addresses against the configured dataset, retain source/version/retrieval time, and escalate direct or indirect matches for compliance review.",
+            "   - Threat intelligence: Correlate wallet, transaction, contract, domain, and scam-infrastructure indicators while preserving the source reference and confidence level.",
+            "   - Smart-contract security: Review privileged roles, upgradeability, approvals, proxy implementation, exploit indicators, malicious token behavior, and contract interaction anomalies when contract evidence is present.",
+            "   - Cross-chain risk: Identify bridges, wrapped assets, destination recipients, correlation method, confidence, and whether each link is observed or inferred.",
+            "   - Monitoring and response: Maintain watch status, alert review history, retry/dead-letter state, reorg handling, and a documented response owner for material changes.",
+            "   - Evidence governance: Preserve raw references, normalized records, timestamps, content hashes, chain-of-custody events, and least-privilege access logs.",
+            "",
+            "19. RECOMMENDED INVESTIGATIVE ACTIONS",
+            "   - Preserve the source transaction, block, provider response, and evidence ledger entry before taking enforcement or recovery action.",
+            "   - Escalate high or critical risk, direct sanctions matches, confirmed threat indicators, and rapid cross-chain movement according to the organization's incident response policy.",
+            "   - Contact the relevant exchange, VASP, bridge, issuer, or custodian through an authenticated channel using only verified identifiers and a minimum-necessary disclosure.",
+            "   - Continue real-time monitoring for new inbound/outbound activity, consolidation, peel-chain behavior, mixer interaction, bridge hops, and entity exposure.",
+            "   - Re-run attribution and risk assessment after new evidence, provider corrections, chain reorganizations, or intelligence dataset updates.",
+            "",
+            "20. INTERPRETATION KEY",
+            "   - OBSERVED: Directly represented by a persisted blockchain or provider observation.",
+            "   - SOURCE-BACKED: Supplied by a configured intelligence, attribution, or sanctions source.",
+            "   - INFERRED: Analytical correlation or classification that requires review and should not be presented as fact.",
+            "   - NOT CONFIGURED / UNKNOWN: No reliable source result is available; absence of a match is not evidence of absence.",
         ])
         content = "\n".join(lines)
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()

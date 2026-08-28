@@ -960,7 +960,41 @@ class CrossChainLink(BaseModel):
     provenance_source: str
     explanation: str
     observed_or_inferred: str = "INFERRED"
+    asset: str | None = None
+    amount: str | None = None
+    timestamp: datetime | None = None
+    bridge_protocol: str | None = None
     created_at: datetime
+
+class CrossChainTransfer(BaseModel):
+    """Canonical, evidence-backed bridge hop between two blockchain networks."""
+    source_chain: Chain
+    destination_chain: Chain
+    source_tx: str
+    destination_tx: str
+    bridge_protocol: str
+    asset: str
+    amount: str
+    timestamp: datetime | None = None
+    confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+    evidence_ids: list[str] = []
+    correlation_id: str
+    observed_or_inferred: str = "INFERRED"
+
+class CrossChainPrimaryPath(BaseModel):
+    status: str = "UNKNOWN"
+    node_ids: list[str] = []
+    edge_ids: list[str] = []
+    chain_labels: list[str] = []
+    terminal_address: str | None = None
+    terminal_entity_id: str | None = None
+    terminal_entity_name: str = "UNKNOWN / UNATTRIBUTED DESTINATION"
+    terminal_entity_type: str = "UNKNOWN"
+    attribution: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+    hops: int = 0
+    why: str = "No verified cross-chain primary path is available."
+    evidence_ids: list[str] = []
+    transaction_hashes: list[str] = []
 
 class CrossChainEvidence(BaseModel):
     evidence_id: str
@@ -1016,6 +1050,8 @@ class CrossChainTrace(BaseModel):
     chains_visited: list[Chain] = []
     cross_chain_hops: int = 0
     cross_chain_links: list[CrossChainLink] = []
+    cross_chain_transfers: list[CrossChainTransfer] = []
+    primary_path: CrossChainPrimaryPath | None = None
     nodes: list[CrossChainNode] = []
     edges: list[CrossChainEdge] = []
     paths: list[CrossChainPath] = []

@@ -1,0 +1,83 @@
+7:30:55 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)
+7:30:55 pm [vite] (client) [console.error] [vite] Failed to reload /src/components/CrossChainPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+7:30:55 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)
+7:30:55 pm [vite] (client) [console.error] [vite] Failed to reload /src/components/CrossChainPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+7:31:03 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)
+7:31:09 pm [vite] (client) Pre-transform error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+7:31:10 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)
+7:31:18 pm [vite] (client) [console.error] [vite] Failed to reload /src/components/CrossChainPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+7:31:19 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)
+7:31:19 pm [vite] (client) [console.error] [vite] Failed to reload /src/components/CrossChainPage.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+7:31:26 pm [vite] Internal server error: Transform failed with 1 error:
+
+[31m[PARSE_ERROR] [0mUnexpected token. Did you mean `{'>'}` or `&gt;`?
+ -  in src/components/CrossChainPage.tsx at 4454..4454
+
+  Plugin: vite:oxc
+  File: C:/Users/motis/Downloads/CRYPTO FRAUD INTELLIGENCE/apps/investigator-web/src/components/CrossChainPage.tsx
+      at transformWithOxc (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4103:19)
+      at TransformPluginContext.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:4174:26)
+      at EnvironmentPluginContainer.transform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:30932:51)
+      at async loadAndTransform (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:20671:26)
+      at async viteTransformMiddleware (file:///C:/Users/motis/Downloads/CRYPTO%20FRAUD%20INTELLIGENCE/apps/investigator-web/node_modules/vite/dist/node/chunks/node.js:25205:20)

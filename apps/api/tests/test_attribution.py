@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from app.attribution import AttributionEngine, NearestEntityResolver
+from app.primary_path import select_primary_path
 from app.domain import *
 
 ROOT="0x"+"a"*40; EXCHANGE="0x"+"b"*40; OTHER="0x"+"c"*40
@@ -24,3 +25,24 @@ def test_nearest_result_uses_graph_hop_and_path_evidence():
     trace=TraceResult(case_id="case",trace_id="trace",root_address=ROOT,mode=DataMode.HISTORICAL,provider="fixture",nodes=[GraphNode(id=ROOT,address=ROOT,depth=0),GraphNode(id=OTHER,address=OTHER,depth=1),GraphNode(id=EXCHANGE,address=EXCHANGE,depth=2)],edges=[e1,e2],signals=[],evidence=[Evidence(evidence_id="ev-1",case_id="case",type="TRANSACTION",chain=Chain.ETHEREUM,tx_hash=e1.transaction_hash,source="fixture",captured_at=datetime.now(timezone.utc)),Evidence(evidence_id="ev-2",case_id="case",type="TRANSACTION",chain=Chain.ETHEREUM,tx_hash=e2.transaction_hash,source="fixture",captured_at=datetime.now(timezone.utc))],paths=[TransactionPath(path_id="path",node_ids=[ROOT,OTHER,EXCHANGE],edges=[e1,e2])])
     result=NearestEntityResolver(AttributionEngine(entities,sources,records)).resolve(trace)
     assert result[0].hop_distance==2 and len(result[0].evidence)==2 and result[0].role==AttributionRole.DEPOSIT
+
+def test_primary_path_stops_at_nearest_attributed_vasp():
+    entities, sources, records = catalog()
+    records = [item for item in records if item.entity_id == "entity-a"]
+    far = "0x" + "d" * 40
+    records.append(AddressAttribution(attribution_id="a3", chain=Chain.ETHEREUM, address=far, entity_id="entity-a", role=AttributionRole.DEPOSIT_ADDRESS, confidence=ConfidenceLevel.CONFIRMED, source_id="official", source_reference="fixture://official"))
+    e1, e2 = edge("1", ROOT, OTHER), edge("2", OTHER, EXCHANGE)
+    e3 = edge("3", EXCHANGE, far)
+    trace = TraceResult(case_id="case", trace_id="trace", root_address=ROOT, mode=DataMode.HISTORICAL, provider="fixture", nodes=[GraphNode(id=x, address=x, depth=i) for i, x in enumerate([ROOT, OTHER, EXCHANGE, far])], edges=[e1, e2, e3], signals=[], evidence=[])
+    primary = select_primary_path(trace, entities, sources, records)
+    assert primary["terminal_entity_name"] == "Test Exchange"
+    assert primary["hops"] == 2
+    assert primary["transaction_hashes"] == [e1.transaction_hash, e2.transaction_hash]
+
+def test_primary_path_does_not_fabricate_unknown_attribution():
+    entities, sources, records = catalog()
+    e1 = edge("1", ROOT, OTHER)
+    trace = TraceResult(case_id="case", trace_id="trace", root_address=ROOT, mode=DataMode.HISTORICAL, provider="fixture", nodes=[GraphNode(id=ROOT, address=ROOT, depth=0), GraphNode(id=OTHER, address=OTHER, depth=1)], edges=[e1], signals=[], evidence=[])
+    primary = select_primary_path(trace, entities, sources, records)
+    assert primary["status"] == "UNATTRIBUTED"
+    assert primary["terminal_entity_name"] == "UNKNOWN / UNATTRIBUTED DESTINATION"

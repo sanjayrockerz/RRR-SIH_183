@@ -1,0 +1,17 @@
+
+> investigator-web@0.1.0 dev
+> vite --host 0.0.0.0
+
+
+  VITE v8.2.2  ready in 814 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://192.168.29.232:5173/  Wi-Fi
+  ➜  Network: http://172.17.192.1:5173/    vEthernet (WSL (Hyp…
+7:30:53 pm [vite] (client) hmr update /src/components/CrossChainPage.tsx
+7:30:54 pm [vite] (client) hmr update /src/components/CrossChainPage.tsx
+7:31:08 pm [vite] (client) page reload src/main.tsx
+7:33:13 pm [vite] (client) hmr update /src/components/CrossChainPage.tsx
+7:42:12 pm [vite] .env changed, restarting server...
+7:42:12 pm [vite] server restarted.
+7:42:29 pm [vite] (client) hmr update /src/App.tsx, /src/components/PatternsPage.tsx, /src/components/CrossChainPage.tsx, /src/components/RealtimePage.tsx, /src/components/RiskPage.tsx, /src/components/EvidenceLedgerPanel.tsx, /src/components/RelatedCasesPanel.tsx, /src/components/ConnectedIntake.tsx, /src/components/ReadableEvidencePage.tsx, /src/components/GraphInspector.tsx, /src/components/SyntheticGenerator.tsx, /src/components/WorkflowPanel.tsx, /src/components/SyntheticRealtimeControl.tsx and 6 more

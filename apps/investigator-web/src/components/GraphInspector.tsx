@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import type { Edge, Node, RiskAssessment, Trace } from '../types';
+import type { Edge, Node, PrimaryPath, RiskAssessment, Trace } from '../types';
 import { api } from '../api';
 
 const short = (value: string) => value && value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
@@ -57,6 +57,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [asset, setAsset] = useState('ALL');
   const [risk, setRisk] = useState<RiskAssessment | null>(null);
+  const [primaryPath, setPrimaryPath] = useState<PrimaryPath | null>(null);
   
   // Custom coordinates for draggable nodes
   const [customPositions, setCustomPositions] = useState<Record<string, Point>>({});
@@ -69,6 +70,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
 
   useEffect(() => {
     api.risk(trace.case_id).then(setRisk).catch(() => setRisk(null));
+    api.primaryPath(trace.case_id).then(setPrimaryPath).catch(() => setPrimaryPath(null));
     // Load persisted layout if available
     api.graphLayout(trace.case_id).then(layoutData => {
       if (layoutData && layoutData.node_positions) {
@@ -148,6 +150,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   };
 
   const riskTransactions = new Set(risk?.factors.flatMap(item => item.transaction_hashes) || []);
+  const primaryTransactions = new Set(primaryPath?.transaction_hashes || []);
+  const primaryNodes = new Set((primaryPath?.node_ids || []).map(address => address.toLowerCase()));
   const edgeFactors = (item: Edge) => risk?.factors.filter(factor => factor.transaction_hashes.includes(item.transaction_hash)) || [];
   const nodeFactors = (item: Node) => risk?.factors.filter(factor => factor.transaction_hashes.some(tx => trace.edges.some(itemEdge => itemEdge.transaction_hash === tx && (itemEdge.source === item.address || itemEdge.target === item.address)))) || [];
 
@@ -340,20 +344,21 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                     const source = point(item.source, item.transfer.chain);
                     const target = point(item.target, item.transfer.chain);
                     const bearing = riskTransactions.has(item.transaction_hash);
+                    const isPrimary = primaryTransactions.has(item.transaction_hash);
                     const selected = selectedEdge?.edge_id === item.edge_id;
                     const token = item.transfer.transfer_type !== 'native';
                     return (
                       <g 
                         key={item.edge_id} 
-                        className={`graph-edge ${bearing ? 'risk-bearing' : ''} ${token ? 'token-edge' : ''} ${selected ? 'selected' : ''}`} 
+                        className={`graph-edge ${bearing ? 'risk-bearing' : ''} ${token ? 'token-edge' : ''} ${selected ? 'selected' : ''} ${isPrimary ? 'primary-path-edge' : ''}`}
                         role="button" 
                         tabIndex={0} 
                         aria-label={`Inspect transfer ${short(item.transaction_hash)}`} 
                         onClick={() => { setSelectedEdge(item); setSelectedNode(null); }}
                       >
-                        <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} markerEnd="url(#graph-arrow)" stroke={selected ? '#3b82f6' : bearing ? '#ef4444' : '#4b5563'} strokeWidth={selected ? 3 : 1.5} />
+                        <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} markerEnd="url(#graph-arrow)" stroke={isPrimary ? '#4de1c1' : selected ? '#3b82f6' : bearing ? '#ef4444' : '#4b5563'} strokeWidth={isPrimary ? 5 : selected ? 3 : 1.5} opacity={isPrimary ? 1 : 0.45} />
                         <rect x={(source.x + target.x) / 2 - 40} y={(source.y + target.y) / 2 - 10} width="80" height="20" rx="3" fill="#111827" stroke="#374151" strokeWidth="1" />
-                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 4} textAnchor="middle" fill="#9ca3af" fontSize="10">{short(item.transfer.amount)} {item.transfer.asset}</text>
+                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 4} textAnchor="middle" fill={isPrimary ? '#b8fff0' : '#9ca3af'} fontSize="10">{isPrimary ? `H${item.hop} ` : ''}{short(item.transfer.amount)} {item.transfer.asset}</text>
                       </g>
                     );
                   })}
@@ -363,6 +368,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                     const position = point(item.address, item.chain);
                     const isRoot = item.address.toLowerCase() === trace.root_address.toLowerCase();
                     const isContract = item.node_type === 'CONTRACT';
+                    const isPrimaryNode = primaryNodes.has(item.address.toLowerCase());
+                    const isTerminal = primaryPath?.status === 'ATTRIBUTED' && primaryPath.terminal_address?.toLowerCase() === item.address.toLowerCase();
                     const nodeRisk = nodeFactors(item).length > 0;
                     const selected = selectedNode ? identity(selectedNode.chain, selectedNode.address) === identity(item.chain, item.address) : false;
                     const isCollapsed = collapsedNodes.has(item.address);
@@ -370,7 +377,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                     return (
                       <g 
                         key={nodeKey(item)} 
-                        className={`graph-node ${isRoot ? 'root' : ''} ${isContract ? 'contract' : ''} ${nodeRisk ? 'risk-node' : ''} ${selected ? 'selected' : ''}`} 
+                        className={`graph-node ${isRoot ? 'root' : ''} ${isContract ? 'contract' : ''} ${nodeRisk ? 'risk-node' : ''} ${selected ? 'selected' : ''} ${isPrimaryNode ? 'primary-path-node' : ''} ${isTerminal ? 'primary-terminal-node' : ''}`}
                         role="button" 
                         tabIndex={0} 
                         transform={`translate(${position.x} ${position.y})`}
@@ -387,8 +394,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                       >
                         <circle r={isRoot ? 32 : 26} fill={isRoot ? '#1e3a8a' : isCollapsed ? '#5b21b6' : isContract ? '#065f46' : '#1f2937'} stroke={selected ? '#3b82f6' : nodeRisk ? '#ef4444' : '#4b5563'} strokeWidth="2" />
                         <circle className="node-core" r={isRoot ? 24 : 18} fill="#0f172a" />
-                        <text className="node-type" textAnchor="middle" y="4" fill="#e5e7eb" fontSize="8" fontWeight="bold">{isRoot ? 'ROOT' : isContract ? 'CONTRACT' : 'WALLET'}</text>
-                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="500">{short(item.address)}</text>
+                        <text className="node-type" textAnchor="middle" y="4" fill="#e5e7eb" fontSize="8" fontWeight="bold">{isRoot ? 'ROOT' : isTerminal ? primaryPath?.terminal_entity_type : isContract ? 'CONTRACT' : 'WALLET'}</text>
+                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="500">{isTerminal ? primaryPath?.terminal_entity_name : short(item.address)}</text>
                       </g>
                     );
                   })}
@@ -424,7 +431,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
         <Metric label="PATHS" value={trace.metrics.path_count} />
         <Metric label="MAX HOP" value={trace.metrics.maximum_hop} />
       </div>
-      <GraphAnalysisRail trace={trace} edges={visibleEdges} />
+      <GraphAnalysisRail trace={trace} edges={visibleEdges} primaryPath={primaryPath} />
     </div>
   );
 }
@@ -609,10 +616,17 @@ export function GraphUnavailable({ onNavigate }: { onNavigate: (route: string) =
   );
 }
 
-function GraphAnalysisRail({ trace, edges }: { trace: Trace; edges: Edge[] }) {
+function GraphAnalysisRail({ trace, edges, primaryPath }: { trace: Trace; edges: Edge[]; primaryPath: PrimaryPath | null }) {
   const recent = [...edges].filter(item => item.transfer.timestamp).sort((a, b) => String(b.transfer.timestamp).localeCompare(String(a.transfer.timestamp))).slice(0, 4);
   return (
     <section className="graph-analysis-rail" aria-label="Observed flow analysis">
+      <div className="primary-path-panel">
+        <div className="eyebrow">PRIMARY INVESTIGATIVE PATH</div>
+        <div className="primary-path-chain">{primaryPath?.node_ids?.length ? primaryPath.node_ids.map((address, index) => <React.Fragment key={`${address}-${index}`}><span>{primaryPath.status === 'ATTRIBUTED' && index === primaryPath.node_ids.length - 1 ? primaryPath.terminal_entity_name : index === 0 ? 'ROOT WALLET' : `HOP ${index}`}</span>{index < primaryPath.node_ids.length - 1 && <b>→</b>}</React.Fragment>) : <span>Path unavailable</span>}</div>
+        <div className="primary-path-facts"><div><small>FINAL DESTINATION</small><b>{primaryPath?.terminal_entity_name || 'UNKNOWN / UNATTRIBUTED DESTINATION'}</b></div><div><small>TYPE</small><b>{primaryPath?.terminal_entity_type || 'UNKNOWN'}</b></div><div><small>HOPS</small><b>{primaryPath?.hops ?? 0}</b></div><div><small>ATTRIBUTION</small><b>{primaryPath?.attribution || 'UNKNOWN'}</b></div></div>
+        <div className="primary-path-why"><small>WHY THIS ENDPOINT</small><span>{primaryPath?.why || 'Primary path calculation unavailable.'}</span></div>
+        <div className="primary-path-why"><small>EVIDENCE</small><span>{primaryPath?.transaction_hashes?.length ? primaryPath.transaction_hashes.map(short).join(' | ') : 'No linked transaction evidence'}</span></div>
+      </div>
       <div className="analysis-heading">
         <div>
           <div className="eyebrow">FLOW ANALYSIS / OBSERVED FACTS</div>

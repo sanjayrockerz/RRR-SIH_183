@@ -1,0 +1,163 @@
+INFO:     Started server process [63884]
+INFO:     Waiting for application startup.
+2026-08-28 19:29:18,990 ERROR crypto_fraud_intelligence database_error
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2026-08-28 19:30:19,760 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:30:49,925 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:31:01,245 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:31:11,817 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:31:12,174 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:31:28,128 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:31:28,159 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:00,307 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:00,440 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:00,520 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:12,675 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:12,852 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:13,213 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:22,728 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:22,738 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:23,470 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:32:23,608 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,624 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,627 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,638 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,641 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,655 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,663 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,670 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,700 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:23,898 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:32:24,635 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:14,632 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:15,130 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:15,131 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:15,636 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:15,637 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:15,639 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:16,102 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:16,124 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:16,228 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:16,708 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:16,735 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:17,769 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:17,800 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:18,279 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:18,423 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:19,050 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:24,659 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:25,394 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:25,399 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:26,255 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:26,262 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:34,328 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:35,061 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:35,065 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:36,030 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:36,161 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:44,327 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:45,054 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:45,079 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:45,984 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:46,014 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:54,334 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:54,805 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:54,829 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:33:55,409 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:33:55,464 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:04,332 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:04,802 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:04,805 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:05,365 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:05,414 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:14,345 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:14,816 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:14,822 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:15,414 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:15,465 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:24,335 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:24,804 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:24,805 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:25,444 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:25,452 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:34,330 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:34,801 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:34,803 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:35,429 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:35,455 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:44,329 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:44,854 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:44,856 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:45,452 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:45,501 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:54,336 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:54,831 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:54,856 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:34:55,441 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:34:55,476 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:04,328 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:04,827 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:04,832 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:05,423 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:05,475 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:14,330 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:14,819 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:14,821 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:15,421 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:15,426 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:24,331 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:24,808 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:24,834 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:25,448 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:25,505 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:34,333 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:34,863 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:34,865 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:35,502 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:35,531 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:44,331 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:44,791 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:44,793 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:45,440 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:45,444 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:54,333 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:54,768 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:54,771 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:35:55,347 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:35:55,352 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:04,324 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:04,772 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:04,774 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:05,276 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:05,338 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:14,325 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:14,758 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:14,760 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:15,308 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:15,318 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:24,333 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:24,786 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:24,810 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:25,383 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:25,402 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:34,339 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:34,820 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:34,845 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:35,443 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:35,455 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:44,334 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:44,777 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:44,802 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:45,365 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:45,399 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:54,333 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:54,811 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:54,813 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:36:55,366 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:36:55,429 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:37:04,327 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:37:04,774 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:37:04,777 ERROR crypto_fraud_intelligence database_error
+2026-08-28 19:37:05,402 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
+2026-08-28 19:37:05,430 INFO httpx HTTP Request: POST https://eth-mainnet.g.alchemy.com/v2/alch_N2npkDETokS1WG7MEoN4q "HTTP/1.1 200 OK"
