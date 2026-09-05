@@ -1,0 +1,42 @@
+{
+  "RISK-001": {
+    "expected_score_max": 39.0,
+    "allowed_bands": ["LOW", "GUARDED"]
+  },
+  "RISK-002": {
+    "expected_score_max": 60.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED"]
+  },
+  "RISK-003": {
+    "expected_score_min": 0.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED", "HIGH"]
+  },
+  "RISK-004": {
+    "expected_score_max": 65.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED"]
+  },
+  "RISK-005": {
+    "expected_score_max": 55.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED"]
+  },
+  "RISK-006": {
+    "expected_score_min": 0.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED", "HIGH"]
+  },
+  "RISK-007": {
+    "expected_score_min": 20.0,
+    "allowed_bands": ["GUARDED", "ELEVATED", "HIGH", "CRITICAL"]
+  },
+  "RISK-008": {
+    "expected_score_max": 60.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED"]
+  },
+  "RISK-009": {
+    "expected_score_max": 60.0,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED"]
+  },
+  "RISK-010": {
+    "reproducible": true,
+    "allowed_bands": ["LOW", "GUARDED", "ELEVATED", "HIGH"]
+  }
+}

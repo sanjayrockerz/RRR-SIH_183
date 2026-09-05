@@ -1,0 +1,102 @@
+[
+  {
+    "scenario_id": "RISK-001",
+    "title": "Benign Wallet",
+    "description": "Normal activity, no fraud linkage, no suspicious pattern, no VASP exposure",
+    "root_address": "0x1111111111111111111111111111111111111111",
+    "chain": "ethereum",
+    "factors": [],
+    "expected_band_in": ["LOW", "GUARDED"],
+    "max_score": 39.0
+  },
+  {
+    "scenario_id": "RISK-002",
+    "title": "Rapid Movement Only",
+    "description": "Rapid hop transfer pattern on single wallet without victim linkage or mixer interaction",
+    "root_address": "0x2222222222222222222222222222222222222222",
+    "chain": "ethereum",
+    "factors": ["pattern:rapid_hop"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED"],
+    "max_score": 60.0
+  },
+  {
+    "scenario_id": "RISK-003",
+    "title": "Multi-Victim Linkage",
+    "description": "Shared intermediary wallet connecting multiple independent victim cases",
+    "root_address": "0x3333333333333333333333333333333333333333",
+    "chain": "ethereum",
+    "factors": ["correlation:multi_victim"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED", "HIGH"],
+    "min_score": 0.0
+  },
+  {
+    "scenario_id": "RISK-004",
+    "title": "VASP Exposure Only",
+    "description": "Receiving funds reach a known or probable VASP deposit address",
+    "root_address": "0x4444444444444444444444444444444444444444",
+    "chain": "ethereum",
+    "factors": ["vasp:deposit_proximity"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED"],
+    "max_score": 65.0
+  },
+  {
+    "scenario_id": "RISK-005",
+    "title": "Cross-Chain Only",
+    "description": "Funds cross chain boundaries via bridge protocol",
+    "root_address": "0x5555555555555555555555555555555555555555",
+    "chain": "ethereum",
+    "factors": ["pattern:bridge_hop"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED"],
+    "max_score": 55.0
+  },
+  {
+    "scenario_id": "RISK-006",
+    "title": "Mixer Interaction",
+    "description": "Interaction with known mixer smart contract",
+    "root_address": "0x6666666666666666666666666666666666666666",
+    "chain": "ethereum",
+    "factors": ["entity:mixer_interaction"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED", "HIGH"],
+    "min_score": 0.0
+  },
+  {
+    "scenario_id": "RISK-007",
+    "title": "Combined Signals",
+    "description": "Rapid hop + Multi-victim + VASP exposure + Cross-chain + Mixer",
+    "root_address": "0x7777777777777777777777777777777777777777",
+    "chain": "ethereum",
+    "factors": ["pattern:rapid_hop", "correlation:multi_victim", "vasp:deposit_proximity", "pattern:bridge_hop", "entity:mixer_interaction"],
+    "expected_band_in": ["GUARDED", "ELEVATED", "HIGH", "CRITICAL"],
+    "min_score": 20.0
+  },
+  {
+    "scenario_id": "RISK-008",
+    "title": "Contradictory Evidence",
+    "description": "High risk signal with mitigating registered institution factor",
+    "root_address": "0x8888888888888888888888888888888888888888",
+    "chain": "ethereum",
+    "factors": ["pattern:rapid_hop"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED"],
+    "max_score": 60.0
+  },
+  {
+    "scenario_id": "RISK-009",
+    "title": "Duplicate Signals",
+    "description": "Multiple occurrences of the same rapid hop observation in one trace window",
+    "root_address": "0x9999999999999999999999999999999999999999",
+    "chain": "ethereum",
+    "factors": ["pattern:rapid_hop", "pattern:rapid_hop", "pattern:rapid_hop"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED"],
+    "max_score": 60.0
+  },
+  {
+    "scenario_id": "RISK-010",
+    "title": "Historical Reproducibility",
+    "description": "Identical snapshot evaluation produces identical score and band across runs",
+    "root_address": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "chain": "ethereum",
+    "factors": ["pattern:rapid_hop", "vasp:deposit_proximity"],
+    "expected_band_in": ["LOW", "GUARDED", "ELEVATED", "HIGH"],
+    "min_score": 0.0
+  }
+]
