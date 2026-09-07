@@ -7,3 +7,9 @@ node_modules/
 dist/
 .pytest_cache/
 .ruff_cache/
+
+.vercel
+.local/
+$target/
+tmp/*.log
+tmp/*.pdf

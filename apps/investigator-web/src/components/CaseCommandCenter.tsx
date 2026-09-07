@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { api } from '../api';
-import type { Case, InvestigationOperationalState, OperationalStage } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import { api, caseIntelligence } from '../api';
+import type { Case, CaseIntelligenceSnapshot, InvestigationOperationalState, OperationalStage } from '../types';
 
 const short = (value?: string) => value && value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : (value || 'Unavailable');
 const stageLabel = (value: string) => value.replaceAll('_', ' ');
@@ -21,6 +21,12 @@ export function CaseCommandCenter({
   const root = activeCase.wallets[0];
   const vasp = summary?.vasp_exposure?.nearest;
   const completed = useMemo(() => state?.stages.filter(item => ['COMPLETED', 'PARTIAL', 'SIMULATED'].includes(item.status)).length || 0, [state]);
+  const [snapshot, setSnapshot] = useState<CaseIntelligenceSnapshot | null>(null);
+  const [snapshotError, setSnapshotError] = useState('');
+  useEffect(() => {
+    setSnapshotError('');
+    caseIntelligence(activeCase.case_id).then(setSnapshot).catch((error) => setSnapshotError(error instanceof Error ? error.message : 'Case intelligence unavailable'));
+  }, [activeCase.case_id]);
 
   const handleStageClick = (stageName: string) => {
     const s = stageName.toUpperCase();
@@ -47,6 +53,13 @@ export function CaseCommandCenter({
 
   return (
     <div className="case-command-overview">
+      <section className="command-panel" style={{ marginBottom: '20px' }} aria-label="Case intelligence snapshot">
+        <div className="panel-title"><div><span className="eyebrow">CASE INTELLIGENCE SNAPSHOT</span><h3>Investigative posture</h3></div><button className="secondary" onClick={() => onNavigate('vasp-intelligence')}>VASP ACTIONABILITY</button></div>
+        {snapshotError ? <p className="empty-copy" role="status">{snapshotError}</p> : snapshot ? <div className="case-operation-grid"><Metric label="RISK POSTURE" value={snapshot.risk ? `${snapshot.risk.band} ${snapshot.risk.score}` : 'NO DATA'} detail={snapshot.risk_delta ? `Δ ${snapshot.risk_delta.delta >= 0 ? '+' : ''}${snapshot.risk_delta.delta}` : 'No prior assessment'} /><Metric label="CROSS-CHAIN" value={String(snapshot.cross_chain_summary.status || 'NO DATA')} detail={`${snapshot.cross_chain_summary.cross_chain_movements || 0} persisted link(s)`} /><Metric label="CASE FUSION" value={snapshot.related_cases_summary.count} detail="Exact persisted overlap(s)" /><Metric label="WATCH" value={snapshot.watch_state.active ? 'ACTIVE' : 'NOT CONFIGURED'} detail={`${snapshot.watch_state.count || 0} target(s)`} /></div> : <p className="empty-copy">Loading persisted case intelligence…</p>}
+        {snapshot?.recommended_actions.length ? <div className="factor-stack" style={{ marginTop: '15px' }}>{snapshot.recommended_actions.map(action => <div className="factor-line" key={`${action.priority}:${action.title}`}><span><b>PRIORITY {action.priority}</b> {action.title}</span><small>{action.reason}</small></div>)}</div> : snapshot && <p className="empty-copy">NO RECOMMENDATIONS — no qualifying persisted signal is available.</p>}
+        {snapshot?.intervention_priority && <div className="factor-stack" style={{ marginTop: '15px' }}><div className="factor-line"><span><b>INTERVENTION PRIORITY {snapshot.intervention_priority.level}</b> · {snapshot.intervention_priority.score}/100</span><small>{snapshot.intervention_priority.reasons.join(' · ')}</small></div></div>}
+        {snapshot?.threat_intelligence && <div className="factor-line" style={{ marginTop: '10px' }}><span><b>THREAT CONTEXT</b> {String(snapshot.threat_intelligence.status || 'NOT_CONFIGURED')}</span><small>Source-backed screening results remain separate from on-chain facts and risk.</small></div>}
+      </section>
       <div className="case-operation-grid" style={{ marginBottom: '20px' }}>
         <Metric label="REPORTED WALLETS" value={summary?.wallets ?? activeCase.wallets.length} detail={`${root?.chain || 'No chain'} | ${short(root?.address)}`} />
         <Metric label="TRANSACTIONS" value={summary?.transactions ?? 0} detail={`${trace?.mode || 'NO TRACE'} | ${trace?.provider || 'Provider unavailable'}`} />

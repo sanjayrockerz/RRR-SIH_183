@@ -58,6 +58,11 @@ The API uses PostgreSQL as its source of truth. On startup it applies ordered mi
 - `GET /api/v1/cases/{case_id}/risk/delta`
 - `GET /api/v1/cases/{case_id}/risk/factors`
 - `GET /api/v1/cases/{case_id}/risk/alerts`
+- `GET /api/v1/dashboard/intelligence`
+- `GET /api/v1/cases/{case_id}/intelligence`
+- `GET /api/v1/cases/{case_id}/vasp-candidates`
+- `POST /api/v1/cases/{case_id}/vasp-action-package`
+- `GET /api/v1/risk-registry/search`
 - `GET /health`
 - `GET /api/v1/system/status`
 - `GET /api/v1/auth/status`

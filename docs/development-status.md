@@ -25,6 +25,8 @@ The audit confirms that the historical Ethereum investigation path is real and p
 
 Status: IN PROGRESS.
 
+Operational intelligence read models are now implemented: `GET /api/v1/dashboard/intelligence` provides persisted command-center aggregates and deterministic priority-case ordering, while `GET /api/v1/cases/{case_id}/intelligence` provides the case snapshot, evidence-linked risk factors, exact related-case summary, and structured recommendations. The dashboard renders the operational cards and backend-ranked triage queue. VASP lead and cross-chain counts remain empty/unresolved when the corresponding persisted source data is unavailable.
+
 Implemented in the current slice:
 
 - `GET /api/v1/dashboard/summary` backed by PostgreSQL aggregates.

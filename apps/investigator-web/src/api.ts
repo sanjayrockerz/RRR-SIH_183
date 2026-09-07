@@ -1,4 +1,14 @@
-import type {Attribution,Case,CaseListItem,CaseTransaction,CaseSummarySnapshot,GraphLayout,InvestigationOperationalState,Pattern,PatternSummary,RiskAlert,RiskAssessment,RiskDelta,RiskFactor,Trace,Capability,Watch,TimelineEvent,ChangeSet,RealtimeAlert,ChainCapability,CrossChainSummary,CrossChainLink,CrossChainTrace,SystemStatus,DashboardSummary,EntityRecord,EvidenceRecord,ProviderOperationalStatus,AddressAttribution,AttributionSource,IntelligenceSource,AddressScreening,EvidenceLedgerEntry,EvidenceManifest,InvestigationReport,CaseLink,WalletIntelligence,WorkflowEvent,PrimaryPath} from './types';
+import type {Attribution,Case,CaseListItem,CaseTransaction,CaseSummarySnapshot,CaseIntelligenceSnapshot,VaspCandidate,VaspActionPackage,RiskRegistryResponse,RiskRegistryEntry,CaseFusionResponse,CaseFusionClustersResponse,GraphLayout,InvestigationOperationalState,Pattern,PatternSummary,RiskAlert,RiskAssessment,RiskDelta,RiskFactor,Trace,Capability,Watch,TimelineEvent,ChangeSet,RealtimeAlert,ChainCapability,CrossChainSummary,CrossChainLink,CrossChainTrace,SystemStatus,DashboardSummary,DashboardIntelligence,EntityRecord,EvidenceRecord,ProviderOperationalStatus,AddressAttribution,AttributionSource,IntelligenceSource,AddressScreening,EvidenceLedgerEntry,EvidenceManifest,InvestigationReport,CaseLink,WalletIntelligence,WorkflowEvent,PrimaryPath} from './types';
+
+export const dashboardIntelligence=(limit=20)=>request<DashboardIntelligence>(`/api/v1/dashboard/intelligence?limit=${limit}`);
+export const caseIntelligence=(caseId:string)=>request<CaseIntelligenceSnapshot>(`/api/v1/cases/${encodeURIComponent(caseId)}/intelligence`);
+export const vaspCandidates=(caseId:string)=>request<VaspCandidate[]>(`/api/v1/cases/${encodeURIComponent(caseId)}/vasp-candidates`);
+export const vaspCandidate=(caseId:string,entityId:string)=>request<VaspCandidate>(`/api/v1/cases/${encodeURIComponent(caseId)}/vasp-candidates/${encodeURIComponent(entityId)}`);
+export const createVaspActionPackage=(caseId:string,body:{entity_id?:string;address?:string;created_by?:string}={})=>request<VaspActionPackage>(`/api/v1/cases/${encodeURIComponent(caseId)}/vasp-action-package`,json(body));
+export const riskRegistrySearch=(query='',kind='ALL',limit=50)=>request<RiskRegistryResponse>(`/api/v1/risk-registry/search?q=${encodeURIComponent(query)}&kind=${encodeURIComponent(kind)}&limit=${limit}`);
+export const riskRegistryWallet=(chain:string,address:string)=>request<RiskRegistryEntry>(`/api/v1/risk-registry/wallets/${encodeURIComponent(chain)}/${encodeURIComponent(address)}`);
+export const caseFusion=(caseId:string)=>request<CaseFusionResponse>(`/api/v1/cases/${encodeURIComponent(caseId)}/fusion`);
+export const caseFusionClusters=()=>request<CaseFusionClustersResponse>('/api/v1/case-fusion/clusters');
 
 // Empty string = use Vite dev proxy (relative URLs, no CORS issues regardless of port).
 // Undefined/absent = fall back to direct localhost:8000 (for environments without the env file).

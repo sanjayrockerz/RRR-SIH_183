@@ -143,6 +143,189 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             )
         except asyncpg.PostgresError as exc: raise DatabaseError("Dashboard summary could not be retrieved") from exc
 
+    async def dashboard_intelligence(self, limit: int = 20) -> DashboardIntelligence:
+        """Return one backend-owned operational read model for the command center.
+
+        All signals are derived from persisted case, risk, watch, alert, attribution,
+        cross-chain, timeline, and exact-overlap records. Missing signals remain null
+        or zero with an explicit status; the UI must not manufacture them.
+        """
+        pool = self._require_pool()
+        try:
+            async with pool.acquire() as conn:
+                totals = await conn.fetchrow("""
+                    WITH latest_risk AS (
+                      SELECT DISTINCT ON (case_id) case_id, risk_band, score, score_delta
+                      FROM risk_assessments ORDER BY case_id, version DESC
+                    ), vasp_addresses AS (
+                      SELECT DISTINCT aa.chain, lower(aa.address) AS address, ent.entity_id,
+                        ent.name, ent.entity_type, aa.confidence, aa.source_reference
+                      FROM address_attributions aa JOIN entities ent ON ent.entity_id=aa.entity_id
+                      WHERE ent.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE')
+                    )
+                    SELECT
+                      (SELECT count(*) FROM cases c LEFT JOIN latest_risk r ON r.case_id=c.case_id
+                       WHERE c.status <> 'CLOSED' AND (c.priority='CRITICAL' OR r.risk_band='CRITICAL')) AS critical_cases,
+                      (SELECT count(*) FROM watch_targets WHERE status='ACTIVE') AS active_watches,
+                      (SELECT count(DISTINCT (c.case_id, va.entity_id)) FROM cases c
+                       JOIN graph_edges ge ON ge.case_id=c.case_id
+                       JOIN transactions gt ON gt.transaction_id=ge.transaction_id
+                       JOIN vasp_addresses va ON va.chain=gt.chain AND va.address IN (lower(ge.source_wallet), lower(ge.destination_wallet))) AS vasp_leads,
+                      (SELECT count(DISTINCT (c.case_id, va.entity_id)) FROM cases c
+                       JOIN graph_edges ge ON ge.case_id=c.case_id
+                       JOIN transactions gt ON gt.transaction_id=ge.transaction_id
+                       JOIN vasp_addresses va ON va.chain=gt.chain AND va.address IN (lower(ge.source_wallet), lower(ge.destination_wallet))
+                       WHERE va.confidence IN ('HIGH','CONFIRMED')) AS high_confidence_vasp_leads,
+                      (SELECT count(DISTINCT case_id) FROM cross_chain_links) AS cross_chain_cases,
+                      (SELECT count(*) FROM cross_chain_links WHERE correlation_level IN ('UNRESOLVED','NONE')) AS unresolved_cross_chain_cases,
+                      (SELECT count(*) FROM (
+                        SELECT DISTINCT other.case_id FROM case_wallets current JOIN case_wallets other ON other.wallet_id=current.wallet_id WHERE current.case_id<>other.case_id
+                        UNION
+                        SELECT DISTINCT other.case_id FROM case_transactions current JOIN case_transactions other ON other.transaction_id=current.transaction_id WHERE current.case_id<>other.case_id
+                      ) overlap_rows) AS related_case_clusters,
+                      (SELECT count(*) FROM alerts WHERE status='NEW') AS open_alerts,
+                      (SELECT count(*) FROM alerts WHERE status='NEW' AND severity='CRITICAL') AS critical_alerts
+                """)
+                rows = await conn.fetch("""
+                    WITH latest_risk AS (
+                      SELECT DISTINCT ON (case_id) case_id, risk_band, score, score_delta, calculated_at
+                      FROM risk_assessments ORDER BY case_id, version DESC
+                    ), latest_vasp AS (
+                      SELECT DISTINCT ON (ge.case_id) ge.case_id, ent.entity_id, ent.name, ent.entity_type,
+                        gt.chain, COALESCE(ge.hop, 0) AS hop_distance, aa.confidence, aa.source_reference, gt.tx_hash
+                      FROM graph_edges ge
+                      JOIN transactions gt ON gt.transaction_id=ge.transaction_id
+                      JOIN address_attributions aa ON aa.chain=gt.chain AND lower(aa.address) IN (lower(ge.source_wallet), lower(ge.destination_wallet))
+                      JOIN entities ent ON ent.entity_id=aa.entity_id
+                      WHERE ent.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE')
+                      ORDER BY ge.case_id, COALESCE(ge.hop, 0), aa.confidence DESC
+                    ), related AS (
+                      SELECT current.case_id, count(DISTINCT other.case_id) AS related_case_count
+                      FROM case_wallets current JOIN case_wallets other ON other.wallet_id=current.wallet_id
+                      WHERE current.case_id<>other.case_id GROUP BY current.case_id
+                    ), related_tx AS (
+                      SELECT current.case_id, count(DISTINCT other.case_id) AS related_case_count
+                      FROM case_transactions current JOIN case_transactions other ON other.transaction_id=current.transaction_id
+                      WHERE current.case_id<>other.case_id GROUP BY current.case_id
+                    ), base AS (
+                      SELECT c.case_id, c.title, c.external_case_id, c.fraud_type, c.status, c.priority, c.workflow_stage,
+                        r.risk_band, r.score, COALESCE(r.score_delta,0) AS risk_delta,
+                        CASE WHEN EXISTS (SELECT 1 FROM watch_targets w WHERE w.case_id=c.case_id AND w.status='ACTIVE') THEN 'ACTIVE' ELSE 'NOT_CONFIGURED' END AS watch_state,
+                        GREATEST(c.updated_at, COALESCE((SELECT max(t.timestamp) FROM investigation_timeline t WHERE t.case_id=c.case_id), c.updated_at)) AS latest_activity_at,
+                        CASE WHEN v.entity_id IS NULL THEN 0 ELSE 1 END AS vasp_lead_count,
+                        CASE WHEN v.entity_id IS NULL THEN NULL ELSE jsonb_build_object('entity_id',v.entity_id::text,'entity_name',v.name,'entity_type',v.entity_type,'chain',v.chain,'hop_distance',v.hop_distance,'confidence',v.confidence,'source',v.source_reference,'transaction_hash',v.tx_hash) END AS nearest_vasp,
+                        GREATEST(COALESCE(rel.related_case_count,0), COALESCE(relt.related_case_count,0)) AS related_case_count,
+                        (SELECT count(*) FROM alerts a WHERE a.case_id=c.case_id AND a.status='NEW' AND a.severity='CRITICAL') AS open_critical_alerts
+                      FROM cases c LEFT JOIN latest_risk r ON r.case_id=c.case_id LEFT JOIN latest_vasp v ON v.case_id=c.case_id
+                        LEFT JOIN related rel ON rel.case_id=c.case_id LEFT JOIN related_tx relt ON relt.case_id=c.case_id
+                      WHERE c.status <> 'CLOSED'
+                    )
+                    SELECT *, row_number() OVER (ORDER BY
+                      CASE WHEN risk_band='CRITICAL' OR priority='CRITICAL' THEN 1 ELSE 0 END DESC,
+                      CASE WHEN risk_band='HIGH' OR priority='HIGH' THEN 1 ELSE 0 END DESC,
+                      CASE WHEN watch_state='ACTIVE' THEN 1 ELSE 0 END DESC,
+                      CASE WHEN vasp_lead_count>0 THEN 1 ELSE 0 END DESC,
+                      open_critical_alerts DESC, risk_delta DESC, latest_activity_at DESC) AS priority_rank
+                    FROM base
+                    ORDER BY priority_rank LIMIT $1
+                """, max(1, min(limit, 100)))
+                events = await conn.fetch("""SELECT case_id::text AS case_id, event_type, summary, source, timestamp
+                    FROM investigation_timeline ORDER BY timestamp DESC LIMIT 12""")
+                movements = await conn.fetch("""SELECT case_id::text AS case_id, score, risk_band, score_delta, calculated_at
+                    FROM risk_assessments WHERE score_delta IS NOT NULL ORDER BY calculated_at DESC LIMIT 12""")
+                factor_rows = await conn.fetch("""
+                    WITH latest AS (
+                      SELECT DISTINCT ON (case_id) assessment_id
+                      FROM risk_assessments ORDER BY case_id, version DESC
+                    )
+                    SELECT rf.name, SUM(rf.contribution)::float AS contribution,
+                      MAX(rf.max_contribution)::float AS max_contribution,
+                      COUNT(DISTINCT rfe.evidence_id)::int AS evidence_count
+                    FROM latest l
+                    JOIN risk_factors rf ON rf.assessment_id=l.assessment_id
+                    LEFT JOIN risk_factor_evidence rfe ON rfe.factor_id=rf.factor_id
+                    GROUP BY rf.name ORDER BY contribution DESC LIMIT 8
+                """)
+
+            def json_value(value):
+                if not value: return None
+                return json.loads(value) if isinstance(value, str) else value
+            priority_cases = []
+            for row in rows:
+                reasons = []
+                if row["risk_band"] in {"CRITICAL", "HIGH"}: reasons.append(f"{row['risk_band']} persisted risk posture")
+                if float(row["risk_delta"] or 0) > 0: reasons.append(f"risk increased +{float(row['risk_delta']):g}")
+                if row["watch_state"] == "ACTIVE": reasons.append("active watch")
+                if row["vasp_lead_count"]: reasons.append("source-backed VASP lead")
+                if row["open_critical_alerts"]: reasons.append("open critical alert")
+                priority_cases.append(PriorityCase(case_id=str(row["case_id"]), title=row["title"], external_case_reference=row["external_case_id"], fraud_type=row["fraud_type"], status=row["status"], workflow_stage=row["workflow_stage"], risk_band=row["risk_band"], risk_score=float(row["score"]) if row["score"] is not None else None, risk_delta=float(row["risk_delta"] or 0), watch_state=row["watch_state"], latest_activity_at=row["latest_activity_at"], vasp_lead_count=row["vasp_lead_count"], nearest_vasp=json_value(row["nearest_vasp"]), related_case_count=row["related_case_count"] or 0, open_critical_alerts=row["open_critical_alerts"] or 0, priority_rank=row["priority_rank"], priority_reason="; ".join(reasons) if reasons else "No persisted priority signals are available."))
+            return DashboardIntelligence(status="READY", critical_cases=totals["critical_cases"] or 0, active_watches=totals["active_watches"] or 0, vasp_leads=totals["vasp_leads"] or 0, high_confidence_vasp_leads=totals["high_confidence_vasp_leads"] or 0, cross_chain_cases=totals["cross_chain_cases"] or 0, unresolved_cross_chain_cases=totals["unresolved_cross_chain_cases"] or 0, related_case_clusters=totals["related_case_clusters"] or 0, open_alerts=totals["open_alerts"] or 0, critical_alerts=totals["critical_alerts"] or 0, priority_cases=priority_cases, recent_intelligence_events=[dict(item) for item in events], risk_movements=[dict(item) for item in movements], risk_factor_summary=[dict(item) for item in factor_rows], generated_at=datetime.now(timezone.utc))
+        except asyncpg.PostgresError as exc:
+            raise DatabaseError("Dashboard intelligence could not be retrieved") from exc
+
+    async def risk_registry_search(self, query: str = "", kind: str = "ALL", limit: int = 50) -> RiskRegistryResponse:
+        """Search persisted investigative memory without assigning criminal labels."""
+        pool = self._require_pool()
+        normalized_kind = kind.upper()
+        if normalized_kind not in {"ALL", "WALLET", "ENTITY", "VASP", "CASE", "TRANSACTION"}:
+            raise ValueError("kind must be ALL, WALLET, ENTITY, VASP, CASE, or TRANSACTION")
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    WITH wallet_rows AS (
+                      SELECT 'WALLET'::text AS record_type, w.wallet_id::text AS record_id, w.address AS label, w.chain::text AS chain,
+                        count(DISTINCT cw.case_id)::int AS observed_case_count,
+                        min(t.timestamp) AS first_observed, max(t.timestamp) AS last_observed,
+                        max(ra.score)::float AS highest_investigative_risk,
+                        (array_agg(ra.score ORDER BY ra.calculated_at DESC) FILTER (WHERE ra.score IS NOT NULL))[1]::float AS current_investigative_risk,
+                        COALESCE(array_agg(DISTINCT aa.role::text) FILTER (WHERE aa.role IS NOT NULL), ARRAY[]::text[]) AS observed_roles,
+                        COALESCE(array_agg(DISTINCT ent.name) FILTER (WHERE ent.name IS NOT NULL), ARRAY[]::text[]) AS related_vasps,
+                        COALESCE(array_agg(DISTINCT cw.case_id::text), ARRAY[]::text[]) AS connected_case_ids,
+                        (SELECT count(*)::int FROM evidence e WHERE e.case_id IN (SELECT case_id FROM case_wallets WHERE wallet_id=w.wallet_id)) AS evidence_count
+                      FROM wallets w
+                      LEFT JOIN case_wallets cw ON cw.wallet_id=w.wallet_id
+                      LEFT JOIN case_transactions ct ON ct.case_id=cw.case_id
+                      LEFT JOIN transactions t ON t.transaction_id=ct.transaction_id AND ((w.chain='ethereum' AND (lower(t.from_address)=lower(w.address) OR lower(t.to_address)=lower(w.address))) OR (w.chain<>'ethereum' AND (t.from_address=w.address OR t.to_address=w.address)))
+                      LEFT JOIN risk_assessments ra ON ra.case_id=cw.case_id AND ((w.chain='ethereum' AND lower(ra.subject_address)=lower(w.address)) OR (w.chain<>'ethereum' AND ra.subject_address=w.address))
+                      LEFT JOIN address_attributions aa ON aa.chain=w.chain AND ((w.chain='ethereum' AND lower(aa.address)=lower(w.address)) OR (w.chain<>'ethereum' AND aa.address=w.address))
+                      LEFT JOIN entities ent ON ent.entity_id=aa.entity_id AND ent.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE')
+                      GROUP BY w.wallet_id,w.address,w.chain
+                    ), entity_rows AS (
+                      SELECT CASE WHEN e.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE') THEN 'VASP' ELSE 'ENTITY' END::text AS record_type,
+                        e.entity_id::text AS record_id, e.name AS label, NULL::text AS chain, count(DISTINCT ge.case_id)::int AS observed_case_count,
+                        min(ge.timestamp) AS first_observed, max(ge.timestamp) AS last_observed, max(ra.score)::float AS highest_investigative_risk,
+                        (array_agg(ra.score ORDER BY ra.calculated_at DESC) FILTER (WHERE ra.score IS NOT NULL))[1]::float AS current_investigative_risk,
+                        COALESCE(array_agg(DISTINCT aa.role::text), ARRAY[]::text[]) AS observed_roles,
+                        ARRAY[e.name]::text[] AS related_vasps, COALESCE(array_agg(DISTINCT ge.case_id::text), ARRAY[]::text[]) AS connected_case_ids,
+                        (SELECT count(*)::int FROM evidence ev WHERE ev.case_id IN (SELECT DISTINCT ge2.case_id FROM graph_edges ge2 JOIN transactions tx2 ON tx2.transaction_id=ge2.transaction_id JOIN address_attributions aa2 ON aa2.entity_id=e.entity_id AND aa2.chain=tx2.chain AND lower(aa2.address) IN (lower(ge2.source_wallet),lower(ge2.destination_wallet)))) AS evidence_count
+                      FROM entities e JOIN address_attributions aa ON aa.entity_id=e.entity_id
+                      LEFT JOIN graph_edges ge ON lower(aa.address) IN (lower(ge.source_wallet),lower(ge.destination_wallet))
+                      LEFT JOIN transactions tx ON tx.transaction_id=ge.transaction_id AND tx.chain=aa.chain
+                      LEFT JOIN risk_assessments ra ON ra.case_id=ge.case_id
+                      GROUP BY e.entity_id,e.name,e.entity_type
+                    ), case_rows AS (
+                      SELECT 'CASE'::text AS record_type, c.case_id::text AS record_id, COALESCE(c.external_case_id,c.title) AS label, NULL::text AS chain,
+                        count(DISTINCT cw.wallet_id)::int AS observed_case_count, min(c.created_at) AS first_observed, max(c.updated_at) AS last_observed,
+                        (SELECT score::float FROM risk_assessments WHERE case_id=c.case_id ORDER BY calculated_at DESC LIMIT 1) AS highest_investigative_risk,
+                        (SELECT score::float FROM risk_assessments WHERE case_id=c.case_id ORDER BY calculated_at DESC LIMIT 1) AS current_investigative_risk,
+                        ARRAY[]::text[] AS observed_roles, ARRAY[]::text[] AS related_vasps, ARRAY[c.case_id::text] AS connected_case_ids,
+                        (SELECT count(*)::int FROM evidence WHERE case_id=c.case_id) AS evidence_count
+                      FROM cases c LEFT JOIN case_wallets cw ON cw.case_id=c.case_id GROUP BY c.case_id,c.external_case_id,c.title
+                    ), transaction_rows AS (
+                      SELECT 'TRANSACTION'::text AS record_type, t.transaction_id::text AS record_id, t.tx_hash AS label, t.chain::text AS chain,
+                        count(DISTINCT ct.case_id)::int AS observed_case_count, t.timestamp AS first_observed, t.timestamp AS last_observed,
+                        NULL::float AS highest_investigative_risk, NULL::float AS current_investigative_risk, ARRAY[]::text[] AS observed_roles,
+                        ARRAY[]::text[] AS related_vasps, COALESCE(array_agg(DISTINCT ct.case_id::text), ARRAY[]::text[]) AS connected_case_ids,
+                        (SELECT count(*)::int FROM evidence WHERE lower(tx_hash)=lower(t.tx_hash)) AS evidence_count
+                      FROM transactions t LEFT JOIN case_transactions ct ON ct.transaction_id=t.transaction_id GROUP BY t.transaction_id,t.tx_hash,t.chain,t.timestamp
+                    ), all_rows AS (SELECT * FROM wallet_rows UNION ALL SELECT * FROM entity_rows UNION ALL SELECT * FROM case_rows UNION ALL SELECT * FROM transaction_rows)
+                    SELECT * FROM all_rows WHERE ($1='' OR label ILIKE '%' || $1 || '%' OR record_id ILIKE '%' || $1 || '%') AND ($2='ALL' OR record_type=$2) ORDER BY last_observed DESC NULLS LAST, label LIMIT $3
+                """, query.strip(), normalized_kind, max(1, min(limit, 200)))
+            entries = [RiskRegistryEntry(record_type=row["record_type"], record_id=row["record_id"], label=row["label"], address=row["label"] if row["record_type"] == "WALLET" else None, chain=row["chain"], observed_case_count=row["observed_case_count"] or 0, first_observed=row["first_observed"], last_observed=row["last_observed"], highest_investigative_risk=row["highest_investigative_risk"], current_investigative_risk=row["current_investigative_risk"], observed_roles=list(row["observed_roles"] or []), related_vasps=list(row["related_vasps"] or []), connected_case_ids=list(row["connected_case_ids"] or []), evidence_count=row["evidence_count"] or 0) for row in rows]
+            return RiskRegistryResponse(status="READY", query=query, entries=entries, generated_at=datetime.now(timezone.utc))
+        except asyncpg.PostgresError as exc:
+            raise DatabaseError("Risk registry search could not be completed") from exc
+
     async def case_transactions(self, case_id: str, limit: int = 500, offset: int = 0, chain: str | None = None, asset: str | None = None, status: str | None = None, wallet: str | None = None, direction: str | None = None, search: str | None = None, start: datetime | None = None, end: datetime | None = None) -> list[CaseTransactionView]:
         """Canonical ledger data. This deliberately reads persisted rows, not a trace/UI projection."""
         pool=self._require_pool()
@@ -312,6 +495,41 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             return result
         except (asyncpg.PostgresError, ValueError) as exc:
             raise DatabaseError("Related cases could not be retrieved") from exc
+
+    async def case_fusion_fingerprints(self, case_id: str | None = None) -> list[CaseFingerprint]:
+        """Read one bounded, aggregate fingerprint per case for deterministic Case Fusion."""
+        pool = self._require_pool()
+        try:
+            async with pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT c.case_id::text AS case_id,
+                      COALESCE((SELECT array_agg(DISTINCT cw.wallet_id::text ORDER BY cw.wallet_id::text) FROM case_wallets cw WHERE cw.case_id=c.case_id), ARRAY[]::text[]) AS wallet_ids,
+                      COALESCE((SELECT array_agg(DISTINCT ct.transaction_id::text ORDER BY ct.transaction_id::text) FROM case_transactions ct WHERE ct.case_id=c.case_id), ARRAY[]::text[]) AS transaction_ids,
+                      COALESCE((SELECT array_agg(DISTINCT aa.entity_id::text ORDER BY aa.entity_id::text)
+                        FROM graph_edges ge JOIN transactions tx ON tx.transaction_id=ge.transaction_id JOIN address_attributions aa ON aa.chain=tx.chain AND ((ge.source_wallet=aa.address) OR (ge.destination_wallet=aa.address) OR (tx.chain='ethereum' AND (lower(ge.source_wallet)=lower(aa.address) OR lower(ge.destination_wallet)=lower(aa.address))))
+                        WHERE ge.case_id=c.case_id), ARRAY[]::text[]) AS entity_ids,
+                      COALESCE((SELECT array_agg(DISTINCT aa.entity_id::text ORDER BY aa.entity_id::text)
+                        FROM graph_edges ge JOIN transactions tx ON tx.transaction_id=ge.transaction_id JOIN address_attributions aa ON aa.chain=tx.chain AND ((ge.source_wallet=aa.address) OR (ge.destination_wallet=aa.address) OR (tx.chain='ethereum' AND (lower(ge.source_wallet)=lower(aa.address) OR lower(ge.destination_wallet)=lower(aa.address))))
+                        JOIN entities en ON en.entity_id=aa.entity_id WHERE ge.case_id=c.case_id AND en.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE')), ARRAY[]::text[]) AS vasp_ids,
+                      COALESCE((SELECT array_agg(DISTINCT x.bridge_id ORDER BY x.bridge_id) FROM (SELECT bridge_id FROM bridge_interactions WHERE case_id=c.case_id UNION SELECT bridge_id FROM cross_chain_links WHERE case_id=c.case_id) x), ARRAY[]::text[]) AS bridge_ids,
+                      COALESCE((SELECT array_agg(DISTINCT tx.chain ORDER BY tx.chain) FROM graph_edges ge JOIN transactions tx ON tx.transaction_id=ge.transaction_id WHERE ge.case_id=c.case_id), ARRAY[]::text[]) AS chains,
+                      COALESCE((SELECT array_agg(DISTINCT po.pattern_type ORDER BY po.pattern_type) FROM pattern_observations po WHERE po.case_id=c.case_id), ARRAY[]::text[]) AS pattern_types,
+                      (SELECT min(ge.timestamp) FROM graph_edges ge WHERE ge.case_id=c.case_id) AS first_activity,
+                      (SELECT max(ge.timestamp) FROM graph_edges ge WHERE ge.case_id=c.case_id) AS last_activity,
+                      jsonb_build_object('edge_count',(SELECT count(*) FROM graph_edges ge WHERE ge.case_id=c.case_id),'transaction_count',(SELECT count(DISTINCT ge.transaction_id) FROM graph_edges ge WHERE ge.case_id=c.case_id)) AS burst_profile,
+                      COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('wallet_id',w.wallet_id::text,'chain',w.chain,'address',w.address)) FROM case_wallets cw JOIN wallets w ON w.wallet_id=cw.wallet_id WHERE cw.case_id=c.case_id), '[]'::jsonb) AS wallets,
+                      COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('entity_id',en.entity_id::text,'name',en.name,'entity_type',en.entity_type,'chain',aa.chain,'address',aa.address,'confidence',aa.confidence,'source_reference',aa.source_reference))
+                        FROM graph_edges ge JOIN transactions tx ON tx.transaction_id=ge.transaction_id JOIN address_attributions aa ON aa.chain=tx.chain AND ((ge.source_wallet=aa.address) OR (ge.destination_wallet=aa.address) OR (tx.chain='ethereum' AND (lower(ge.source_wallet)=lower(aa.address) OR lower(ge.destination_wallet)=lower(aa.address)))) JOIN entities en ON en.entity_id=aa.entity_id WHERE ge.case_id=c.case_id AND en.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE')), '[]'::jsonb) AS vasps,
+                      COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('bridge_id',x.bridge_id,'name',COALESCE(bd.name,x.bridge_id),'source',COALESCE(bd.source,'UNKNOWN'))) FROM (SELECT bridge_id FROM bridge_interactions WHERE case_id=c.case_id UNION SELECT bridge_id FROM cross_chain_links WHERE case_id=c.case_id) x LEFT JOIN bridge_definitions bd ON bd.bridge_id=x.bridge_id), '[]'::jsonb) AS bridges
+                    FROM cases c
+                    WHERE ($1::uuid IS NULL OR c.case_id=$1::uuid)
+                    ORDER BY c.created_at
+                """, UUID(case_id) if case_id else None)
+            def json_value(value):
+                return json.loads(value) if isinstance(value, str) else (value or [])
+            return [CaseFingerprint(case_id=row['case_id'], wallet_ids=list(row['wallet_ids'] or []), transaction_ids=list(row['transaction_ids'] or []), entity_ids=list(row['entity_ids'] or []), vasp_ids=list(row['vasp_ids'] or []), bridge_ids=list(row['bridge_ids'] or []), chains=list(row['chains'] or []), pattern_types=list(row['pattern_types'] or []), first_activity=row['first_activity'], last_activity=row['last_activity'], burst_profile=json_value(row['burst_profile']), wallets=json_value(row['wallets']), vasps=json_value(row['vasps']), bridges=json_value(row['bridges'])) for row in rows]
+        except (asyncpg.PostgresError, ValueError) as exc:
+            raise DatabaseError("Case Fusion fingerprints could not be retrieved") from exc
     async def list_evidence(self, case_id: str) -> list[Evidence]:
         pool=self._require_pool()
         try:
@@ -412,6 +630,43 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             if not row: return None
             return WalletIntelligence(wallet_id=str(row["wallet_id"]),chain=row["chain"],address=row["address"],first_seen=row["first_seen"],last_seen=row["last_seen"],transaction_count=row["transaction_count"],inbound_count=row["inbound_count"],outbound_count=row["outbound_count"],assets=list(row["assets"] or []),case_count=row["case_count"],related_case_ids=list(row["related_case_ids"] or []),evidence_count=row["evidence_count"])
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Wallet intelligence could not be retrieved") from exc
+
+    async def risk_registry_wallet(self, chain: Chain, address: str) -> RiskRegistryEntry | None:
+        """Return chain-aware wallet memory from persisted graph, risk and case records."""
+        try:
+            async with self._require_pool().acquire() as conn:
+                row = await conn.fetchrow("""
+                    WITH target AS (SELECT wallet_id,address,chain FROM wallets WHERE chain=$1 AND address=$2),
+                    cases_for_wallet AS (SELECT cw.case_id FROM case_wallets cw JOIN target w ON w.wallet_id=cw.wallet_id),
+                    activity AS (SELECT DISTINCT ge.case_id,ge.transaction_id,ge.timestamp,ge.asset,ge.source_wallet,ge.destination_wallet FROM graph_edges ge JOIN transactions tx ON tx.transaction_id=ge.transaction_id JOIN target w ON ge.case_id IN (SELECT case_id FROM cases_for_wallet) AND ((w.chain='ethereum' AND tx.chain='ethereum' AND (lower(ge.source_wallet)=lower(w.address) OR lower(ge.destination_wallet)=lower(w.address))) OR (w.chain<>'ethereum' AND tx.chain=w.chain AND (ge.source_wallet=w.address OR ge.destination_wallet=w.address)))),
+                    risks AS (SELECT ra.* FROM risk_assessments ra JOIN cases_for_wallet c ON c.case_id=ra.case_id),
+                    attributed AS (SELECT DISTINCT en.entity_id::text AS entity_id,en.name,en.entity_type,aa.chain,aa.address,aa.confidence,aa.source_reference FROM address_attributions aa JOIN entities en ON en.entity_id=aa.entity_id JOIN activity a ON a.case_id IN (SELECT case_id FROM cases_for_wallet) AND ((aa.chain='ethereum' AND (lower(aa.address)=lower(a.source_wallet) OR lower(aa.address)=lower(a.destination_wallet))) OR (aa.chain<>'ethereum' AND (aa.address=a.source_wallet OR aa.address=a.destination_wallet))) WHERE aa.chain=$1 AND en.entity_type IN ('VASP','EXCHANGE','CUSTODIAL_SERVICE','SERVICE'))
+                    SELECT w.wallet_id::text AS wallet_id,w.address,w.chain,
+                      (SELECT min(timestamp) FROM activity) AS first_observed,(SELECT max(timestamp) FROM activity) AS last_observed,
+                      (SELECT count(DISTINCT tr.trace_id)::int FROM trace_runs tr JOIN cases_for_wallet cf ON cf.case_id=tr.case_id) AS trace_count,
+                      (SELECT count(DISTINCT transaction_id)::int FROM activity) AS transaction_count,
+                      (SELECT count(DISTINCT case_id)::int FROM cases_for_wallet) AS observed_case_count,
+                      (SELECT max(score)::float FROM risks) AS highest_score,
+                      (SELECT (array_agg(risk_band ORDER BY score DESC))[1] FROM risks) AS highest_band,
+                      (SELECT (array_agg(score ORDER BY calculated_at DESC))[1]::float FROM risks) AS latest_score,
+                      (SELECT (array_agg(risk_band ORDER BY calculated_at DESC))[1] FROM risks) AS latest_band,
+                      COALESCE((SELECT array_agg(DISTINCT assessment_id::text ORDER BY assessment_id::text) FROM risks),ARRAY[]::text[]) AS risk_history,
+                      COALESCE((SELECT array_agg(DISTINCT po.pattern_type ORDER BY po.pattern_type) FROM pattern_observations po JOIN cases_for_wallet cf ON cf.case_id=po.case_id),ARRAY[]::text[]) AS patterns,
+                      COALESCE((SELECT jsonb_agg(DISTINCT jsonb_build_object('entity_id',entity_id,'name',name,'entity_type',entity_type,'chain',chain,'address',address,'confidence',confidence,'source_reference',source_reference)) FROM attributed),'[]'::jsonb) AS entities,
+                      COALESCE((SELECT array_agg(DISTINCT name ORDER BY name) FROM attributed),ARRAY[]::text[]) AS vasps,
+                      COALESCE((SELECT array_agg(DISTINCT bridge_id ORDER BY bridge_id) FROM (SELECT bridge_id FROM bridge_interactions WHERE case_id IN (SELECT case_id FROM cases_for_wallet) UNION SELECT bridge_id FROM cross_chain_links WHERE case_id IN (SELECT case_id FROM cases_for_wallet)) b),ARRAY[]::text[]) AS bridges,
+                      COALESCE((SELECT array_agg(DISTINCT case_id::text ORDER BY case_id::text) FROM cases_for_wallet),ARRAY[]::text[]) AS related_cases,
+                      (SELECT count(DISTINCT e.evidence_id)::int FROM evidence e WHERE e.case_id IN (SELECT case_id FROM cases_for_wallet)) AS evidence_count,
+                      COALESCE((SELECT CASE WHEN count(*)=0 THEN 'NO_DATA' ELSE string_agg(DISTINCT outcome,',') END FROM screening_runs WHERE case_id IN (SELECT case_id FROM cases_for_wallet)),'NOT_CONFIGURED') AS threat_status
+                    FROM target w
+                    GROUP BY w.wallet_id,w.address,w.chain
+                """, chain, address)
+            if not row:
+                return None
+            def json_value(value): return json.loads(value) if isinstance(value, str) else (value or [])
+            return RiskRegistryEntry(record_type='WALLET', record_id=row['wallet_id'], label=row['address'], address=row['address'], chain=row['chain'], observed_case_count=row['observed_case_count'] or 0, trace_count=row['trace_count'] or 0, transaction_count=row['transaction_count'] or 0, first_observed=row['first_observed'], last_observed=row['last_observed'], highest_investigative_risk=row['highest_score'], highest_investigative_risk_band=row['highest_band'], current_investigative_risk=row['latest_score'], current_investigative_risk_band=row['latest_band'], risk_history_references=list(row['risk_history'] or []), observed_patterns=list(row['patterns'] or []), associated_entities=json_value(row['entities']), observed_roles=[], related_vasps=list(row['vasps'] or []), associated_bridges=list(row['bridges'] or []), connected_case_ids=list(row['related_cases'] or []), threat_intelligence_status=row['threat_status'] or 'NO_DATA', evidence_count=row['evidence_count'] or 0)
+        except (asyncpg.PostgresError, ValueError) as exc:
+            raise DatabaseError("Risk Registry wallet memory could not be retrieved") from exc
     async def add_transaction(self, case_id: str, transaction: TransactionCreate) -> InvestigationCase:
         pool=self._require_pool(); case_uuid=UUID(case_id); now=datetime.now(timezone.utc)
         try:
@@ -434,7 +689,9 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                     # supplies a plain dict). PostgreSQL expects valid JSON here, so
                     # normalize any remaining datetime-like values at this boundary.
                     limits_json = json.dumps(result.limits.model_dump(mode='json') if result.limits else {}, default=str)
-                    acquisition_json = json.dumps(result.acquisition.model_dump(mode='json') if result.acquisition else {}, default=str)
+                    acquisition_data = result.acquisition.model_dump(mode='json') if result.acquisition else {}
+                    acquisition_data["predominant_path"] = result.predominant_path
+                    acquisition_json = json.dumps(acquisition_data, default=str)
                     await conn.execute("INSERT INTO trace_runs(trace_id,case_id,root_wallet,chain,direction,started_at,completed_at,status,limits,node_count,edge_count,transaction_count,provider,mode,acquisition) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",UUID(result.trace_id),case_uuid,result.root_address,result.edges[0].transfer.chain if result.edges else Chain.ETHEREUM,result.direction,now,now,result.status,limits_json,result.metrics.node_count,result.metrics.edge_count,result.metrics.unique_transaction_count,result.provider,result.mode,acquisition_json)
 
                     for edge in result.edges:
@@ -454,14 +711,25 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
         except asyncpg.PostgresError as exc: raise DatabaseError("Trace persistence failed") from exc
     def _trace_from_rows(self, case_id, wallet_rows, edge_rows, evidence_rows, trace_id="", acquisition=None, trace_mode=DataMode.HISTORICAL, trace_provider="Persisted provider observation"):
         nodes={}; edges=[]
+        evidence_by_tx={str(e["tx_hash"]).lower():str(e["evidence_id"]) for e in evidence_rows if e["tx_hash"]}
         for row in edge_rows:
             nodes.setdefault(row["source_wallet"],GraphNode(id=row["source_wallet"],address=row["source_wallet"],chain=row["chain"],depth=row["hop"]))
             nodes.setdefault(row["destination_wallet"],GraphNode(id=row["destination_wallet"],address=row["destination_wallet"],chain=row["chain"],depth=row["hop"]+1))
             raw=row["raw_reference"] or {}; raw=json.loads(raw) if isinstance(raw,str) else raw
             transfer_raw=row["transfer_raw_reference"] or raw
             transfer_raw=json.loads(transfer_raw) if isinstance(transfer_raw,str) else transfer_raw
+            labels=transfer_raw.get("node_labels", {})
+            types=transfer_raw.get("node_types", {})
+            for address in (row["source_wallet"], row["destination_wallet"]):
+                if address in nodes:
+                    node=nodes[address]
+                    node.metadata.update({"label": labels.get(address, node.metadata.get("label", "")), "entity_type": types.get(address, node.node_type), "is_root": address.lower()==str(row["source_wallet"]).lower() and node.depth==0, "is_endpoint": types.get(address)=="VASP"})
+                    if types.get(address): node.node_type=types[address]; node.entity_type=types[address]
+                    node.is_endpoint = types.get(address)=="VASP"
+                    node.is_root = node.depth == 0
+                    node.entity_name = "Demo Mixer Service" if node.node_type=="MIXER" else ("Demo Exchange" if node.node_type=="VASP" else None)
             transfer=Transfer(tx_hash=row["tx_hash"],chain=row["chain"],block_number=row["block_number"],timestamp=row["timestamp"],source=row["from_address"],destination=row["to_address"],asset=row["asset"],amount=row["amount"],value_native=float(row["native_value"]) if row["native_value"] is not None else None,provider=row["provider"] or raw.get("provider","PostgreSQL"),transfer_type=row["transfer_type"] or "native",contract_address=row["contract_address"] or None,token_id=row["token_id"] or None,decimals=row["decimals"],fee=str(row["fee"]) if row["fee"] is not None else None,raw_reference=transfer_raw)
-            edges.append(GraphEdge(edge_id=f"{row['tx_hash']}:{row['source_wallet']}:{row['destination_wallet']}",source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer,hop=row["hop"]))
+            edges.append(GraphEdge(edge_id=f"{row['tx_hash']}:{row['source_wallet']}:{row['destination_wallet']}",source=row["source_wallet"],target=row["destination_wallet"],transfer=transfer,hop=row["hop"],evidence_id=evidence_by_tx.get(str(row["tx_hash"]).lower())))
         evidence=[Evidence(evidence_id=str(r["evidence_id"]),case_id=case_id,type=r["evidence_type"],chain=r["chain"],tx_hash=r["tx_hash"],source=r["source"],captured_at=r["captured_at"],metadata=(json.loads(r["metadata"]) if isinstance(r["metadata"],str) else (r["metadata"] or {})),content_hash=r.get("content_hash"),integrity_status=r.get("integrity_status") or "UNVERIFIED") for r in evidence_rows]
         reported = next((r["address"] for r in wallet_rows if str(r.get("role", "")).upper() == "REPORTED"), None)
         root = reported or next((r["address"] for r in wallet_rows), next(iter(nodes), ""))
@@ -474,7 +742,10 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
         ordered = sorted(edges, key=lambda edge: (edge.transfer.timestamp or datetime.min.replace(tzinfo=timezone.utc), edge.transaction_hash))
         path_nodes = [ordered[0].source] + [edge.target for edge in ordered] if ordered else [root]
         path = TransactionPath(path_id=f"persisted:{trace_id}", node_ids=path_nodes, edges=ordered) if ordered else None
-        return TraceResult(case_id=case_id,trace_id=trace_id,root_address=root,mode=trace_mode,provider=trace_provider,nodes=list(nodes.values()),edges=edges,signals=[],evidence=evidence,paths=[path] if path else [],metrics=metrics,acquisition=acq,limitations=["Persisted trace results do not re-run analytical rules on read."])
+        predominant = (acquisition or {}).get("predominant_path", []) if isinstance(acquisition, dict) else []
+        # Persisted fixture metadata is authoritative; legacy traces retain their
+        # historical ordered path for compatibility.
+        return TraceResult(case_id=case_id,trace_id=trace_id,root_address=root,mode=trace_mode,provider=trace_provider,nodes=list(nodes.values()),edges=edges,signals=[],evidence=evidence,paths=[path] if path else [],metrics=metrics,acquisition=acq,predominant_path=predominant or path_nodes,limitations=["Persisted trace results do not re-run analytical rules on read."])
 
     async def list_traces(self, case_id: str) -> list[TraceResult]:
         pool=self._require_pool()
@@ -556,7 +827,11 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
         try:
             async with pool.acquire() as conn:
                 row=await conn.fetchrow("SELECT node_positions,viewport,updated_at FROM case_graph_layouts WHERE case_id=$1", UUID(case_id))
-            return GraphLayout(case_id=case_id,node_positions=(row['node_positions'] or {}) if row else {},viewport=(row['viewport'] or {}) if row else {},updated_at=row['updated_at'] if row else None)
+            positions=row['node_positions'] if row else {}
+            viewport=row['viewport'] if row else {}
+            positions=json.loads(positions) if isinstance(positions,str) else (positions or {})
+            viewport=json.loads(viewport) if isinstance(viewport,str) else (viewport or {})
+            return GraphLayout(case_id=case_id,node_positions=positions,viewport=viewport,updated_at=row['updated_at'] if row else None)
         except (asyncpg.PostgresError, ValueError) as exc: raise DatabaseError("Graph layout could not be retrieved") from exc
 
     async def save_graph_layout(self, case_id: str, layout: GraphLayoutUpdate) -> GraphLayout:
@@ -566,7 +841,9 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                 row=await conn.fetchrow("""INSERT INTO case_graph_layouts(case_id,node_positions,viewport,updated_at) VALUES($1,$2::jsonb,$3::jsonb,now())
                     ON CONFLICT(case_id) DO UPDATE SET node_positions=EXCLUDED.node_positions,viewport=EXCLUDED.viewport,updated_at=now()
                     RETURNING node_positions,viewport,updated_at""", UUID(case_id),json.dumps(layout.node_positions),json.dumps(layout.viewport))
-            return GraphLayout(case_id=case_id,node_positions=row['node_positions'] or {},viewport=row['viewport'] or {},updated_at=row['updated_at'])
+            positions=json.loads(row['node_positions']) if isinstance(row['node_positions'],str) else (row['node_positions'] or {})
+            viewport=json.loads(row['viewport']) if isinstance(row['viewport'],str) else (row['viewport'] or {})
+            return GraphLayout(case_id=case_id,node_positions=positions,viewport=viewport,updated_at=row['updated_at'])
         except (asyncpg.PostgresError, ValueError) as exc: raise DatabaseError("Graph layout could not be saved") from exc
 
     async def persist_patterns(self, observations: list[PatternObservation]) -> list[PatternObservation]:

@@ -29,16 +29,19 @@ from .evidence_service import EvidenceService
 from .report_service import ReportService
 from .report_pdf import render_report_pdf
 from .primary_path import select_primary_path
+from .demo_fixtures import fixture_specs, build_fixture, validate_fixture
 from .http_security import error_payload, request_id, validation_detail
 from .auth import AuthenticationError, JwtAuthenticator, auth_status
 from .synthetic_realtime import SyntheticBlockchainEventEngine
 from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
 from .event_bus import RealtimeEventBus
+from .case_fusion_service import CaseFusionService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 provider=AlchemyEthereumProvider(); tron_provider=TronGridProvider(); fixture_provider=DevelopmentFixtureProvider(); provider_registry=BlockchainProviderRegistry([([Chain.ETHEREUM], provider),([Chain.TRON],tron_provider)]); fixture_registry=BlockchainProviderRegistry([([Chain.ETHEREUM], fixture_provider)]); active_registry=fixture_registry if settings.blockchain_data_mode.upper() == "DEVELOPMENT_FIXTURE" else provider_registry; repo=PostgresCaseRepository(); tracer=TraceService(provider,active_registry); pattern_service=PatternService(repo); risk_service=RiskService(repo); alert_service=AlertService(repo); evidence_service=EvidenceService(repo); report_service=ReportService(repo); cross_chain_service=CrossChainService(repo); graph_client=Neo4jClient(); graph_projection=GraphProjectionService(graph_client); realtime_provider=AlchemyRealtimeAdapter(); event_bus=RealtimeEventBus(); realtime_service=RealtimeService(repo,realtime_provider,pattern_service,risk_service,cross_chain_service,graph_projection,event_bus)
 authenticator=JwtAuthenticator(settings.auth_jwt_public_key,settings.auth_jwt_issuer,settings.auth_jwt_audience)
 synthetic_engine=SyntheticBlockchainEventEngine(realtime_service,repo)
+case_fusion_service=CaseFusionService(repo)
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -193,6 +196,15 @@ async def graph_status():
 async def dashboard_summary():
     try: return await repo.dashboard_summary()
     except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/dashboard/intelligence", response_model=DashboardIntelligence)
+async def dashboard_intelligence(limit: int = 20):
+    if limit < 1 or limit > 100:
+        raise HTTPException(422, "limit must be between 1 and 100")
+    try:
+        return await repo.dashboard_intelligence(limit)
+    except DatabaseError as exc:
+        return database_failure(exc)
 
 @app.get("/api/v1/provider/capabilities",response_model=list[ProviderCapability])
 async def capabilities(): return provider.capabilities()
@@ -509,6 +521,8 @@ async def address_attribution(chain: Chain,address: str):
     try:
         WalletCreate(address=address,chain=chain)
         entities,sources,records=await repo.attribution_catalog()
+        if settings.blockchain_data_mode.upper() == "DEVELOPMENT_FIXTURE":
+            entities,sources,records=merge_synthetic_attribution(entities,sources,records)
         return AttributionEngine(entities,sources,records).resolve(chain,address)
     except ValueError: raise HTTPException(422,"Invalid address")
     except DatabaseError as exc: return database_failure(exc)
@@ -626,7 +640,7 @@ async def generate_synthetic_case(body: SyntheticCaseRequest):
     integrity = await repo.database_integrity()
     return {**result, "mode":"DEVELOPMENT_SYNTHETIC", "synthetic": {"scenario":body.scenario.upper(),"seed":body.scenario_seed,"requested_events":body.event_count,"processed_events":batch["processed_events"]}, "integrity":integrity, "note":"All generated records are DEVELOPMENT_SYNTHETIC and were normalized, persisted, graph-projected, assessed, evidenced, and placed on the case timeline through the normal realtime pipeline."}
 
-@app.post("/api/v1/dev/hardcoded-cases")
+@app.post("/api/v1/dev/hardcoded-cases-legacy")
 async def seed_hardcoded_cases():
     """Seed three repeatable lab cases through the normal persisted realtime pipeline."""
     presets = [
@@ -704,6 +718,48 @@ async def seed_hardcoded_cases():
         "cases": results,
         "note": "Select any returned case ID in the existing case selector. Each case is persisted and uses one deterministic primary path.",
     }
+
+@app.post("/api/v1/dev/hardcoded-cases")
+async def seed_deterministic_demo_cases():
+    """Idempotently seed the three DEVELOPMENT_SYNTHETIC investigation fixtures."""
+    results=[]
+    for spec in fixture_specs():
+        existing=next((item for item in await repo.list_cases() if item.external_case_reference==spec["reference"]),None)
+        if existing and (await repo.case_transactions(existing.case_id, limit=1)):
+            case_id=existing.case_id
+            case=await repo.get(case_id)
+            # Repair-safe: a prior interrupted seed may have persisted the trace
+            # before layout/pattern/risk stages completed.
+            repair_trace,repair_patterns,repair_config,repair_layout=build_fixture(spec,case_id)
+            await repo.save_graph_layout(case_id,GraphLayoutUpdate(node_positions=repair_layout["positions"],viewport=repair_layout["viewport"]))
+            if spec.get("cross_chain"):
+                await _seed_fixture_cross_chain(case_id, spec, repair_trace)
+            if not await risk_service.latest(case_id):
+                await repo.persist_patterns(repair_patterns)
+                repaired=await risk_service.assess(case_id,RiskAssessRequest(trace_id=case.latest_trace.trace_id if case and case.latest_trace else repair_trace.trace_id,config=repair_config))
+                await repo.set_workflow_stage(case_id,CaseWorkflowStage.RISK_ASSESSED,provider="RuleBasedRiskEngine",result_count=len(repaired.factors),evidence_ids=repaired.evidence_ids)
+            results.append({"case_id":case_id,"fixture_id":spec["reference"],"existing":True,"risk_score":spec["risk"],"transactions":len(spec["amounts"])})
+            continue
+        case=existing or await repo.create(CaseCreate(title=spec["title"],fraud_type=spec["fraud_type"],priority="HIGH",external_case_reference=spec["reference"],description="DEVELOPMENT_SYNTHETIC fixture; deterministic training data only."))
+        await repo.add_wallet(case.case_id,WalletCreate(address=spec["root"],chain=Chain.ETHEREUM))
+        trace,patterns,risk_config,layout=build_fixture(spec,case.case_id)
+        validate_fixture(trace)
+        if spec.get("cross_chain"):
+            await _seed_fixture_cross_chain(case.case_id, spec, trace, analyze=False)
+        await repo.persist_trace(trace)
+        if spec.get("cross_chain"):
+            await _seed_fixture_cross_chain(case.case_id, spec, trace)
+        await graph_projection.project(trace)
+        await repo.save_graph_layout(case.case_id,GraphLayoutUpdate(node_positions=layout["positions"],viewport=layout["viewport"]))
+        await repo.set_workflow_stage(case.case_id,CaseWorkflowStage.TRACE_ANALYZED,provider=trace.provider,result_count=len(trace.edges),evidence_ids=[e.evidence_id for e in trace.evidence])
+        await repo.persist_patterns(patterns)
+        await repo.set_workflow_stage(case.case_id,CaseWorkflowStage.PATTERNS_ANALYZED,provider="PatternEngine",result_count=len(patterns),evidence_ids=[e.evidence_id for e in trace.evidence])
+        assessment=await risk_service.assess(case.case_id,RiskAssessRequest(trace_id=trace.trace_id,config=risk_config))
+        if round(assessment.score)!=spec["risk"]: raise AssertionError(f"{spec['reference']} risk score drifted: {assessment.score}")
+        await repo.set_workflow_stage(case.case_id,CaseWorkflowStage.RISK_ASSESSED,provider="RuleBasedRiskEngine",result_count=len(assessment.factors),evidence_ids=assessment.evidence_ids)
+        await repo.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case.case_id,timestamp=trace.edges[-1].transfer.timestamp,event_type="DEVELOPMENT_FIXTURE_SEEDED",summary=f"{spec['reference']} persisted as DEVELOPMENT_SYNTHETIC with one explicit predominant path.",source="DevelopmentFixture",evidence_ids=[e.evidence_id for e in trace.evidence],metadata={"fixture_id":spec["reference"],"predominant_path":trace.predominant_path}))
+        results.append({"case_id":case.case_id,"fixture_id":spec["reference"],"existing":False,"risk_score":assessment.score,"risk_level":assessment.band,"transactions":len(trace.edges),"graph_nodes":len(trace.nodes),"graph_edges":len(trace.edges),"predominant_path":trace.predominant_path})
+    return {"mode":"DEVELOPMENT_SYNTHETIC","cases":results,"validation":"PASSED","note":"Deterministic PostgreSQL-backed demo fixtures. No live blockchain data."}
 
 @app.get("/api/v1/dev/fixture/status")
 async def development_fixture_status():
@@ -814,6 +870,111 @@ async def case_summary(case_id: str):
         return await _case_summary_snapshot(case)
     except DatabaseError as exc: return database_failure(exc)
 
+@app.get("/api/v1/cases/{case_id}/vasp-candidates", response_model=list[VaspCandidate])
+async def case_vasp_candidates(case_id: str):
+    case = await get_case(case_id)
+    try:
+        candidates = await _case_vasp_candidates(case.latest_trace)
+        return candidates or [_unresolved_vasp_candidate(case.latest_trace)]
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/vasp-candidates/{entity_id}", response_model=VaspCandidate)
+async def case_vasp_candidate(case_id: str, entity_id: str):
+    case = await get_case(case_id)
+    try:
+        candidate = next((item for item in await _case_vasp_candidates(case.latest_trace) if item.entity_id == entity_id), None)
+        if candidate is None:
+            raise HTTPException(404, "VASP candidate is not available from the persisted trace")
+        return candidate
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.post("/api/v1/cases/{case_id}/vasp-action-package", response_model=VaspActionPackage)
+async def create_vasp_action_package(case_id: str, body: VaspActionPackageRequest = VaspActionPackageRequest()):
+    """Create a report/evidence-backed coordination snapshot for investigator review."""
+    try:
+        case = await get_case(case_id)
+        candidates = await _case_vasp_candidates(case.latest_trace)
+        selected = next((item for item in candidates if (body.entity_id and item.entity_id == body.entity_id) or (body.address and item.address.lower() == body.address.lower())), None)
+        if selected is None and candidates:
+            selected = candidates[0]
+        report = await report_service.generate(case_id, ReportCreateRequest(report_type=ReportType.FUND_FLOW, trace_id=case.latest_trace.trace_id if case.latest_trace else None, created_by=body.created_by))
+        evidence_ids = selected.evidence_ids if selected else report.evidence_ids
+        manifest = None
+        if evidence_ids:
+            manifest = await evidence_service.create_manifest(case_id, EvidenceManifestRequest(evidence_ids=evidence_ids, created_by=body.created_by))
+        limitations = ["This package is an investigative work product, not proof of ownership or criminality.", "Observed flow does not establish control of the candidate entity.", "VASP coordination, freezing, recovery, or disclosure decisions require authorized human review."]
+        if not selected:
+            limitations.append("No source-backed VASP candidate was resolved from the persisted trace.")
+        return VaspActionPackage(package_id=report.report_id, report_id=report.report_id, manifest_id=manifest.manifest_id if manifest else None, case_id=case_id, case_reference=case.external_case_reference, source_wallet=case.latest_trace.root_address if case.latest_trace else (case.wallets[0].address if case.wallets else None), vasp_candidate=selected, transaction_hashes=selected.evidence_path if selected else [item.tx_hash for item in case.transactions], evidence_ids=manifest.evidence_ids if manifest else evidence_ids, evidence_manifest_hash=manifest.content_hash if manifest else None, limitations=limitations, generated_at=datetime.now(timezone.utc))
+    except ValueError as exc:
+        raise HTTPException(422 if "evidence" in str(exc).lower() else 404, str(exc)) from exc
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/intelligence", response_model=CaseIntelligenceSnapshot)
+async def case_intelligence(case_id: str):
+    """High-density investigator snapshot assembled from persisted case signals."""
+    try:
+        case = await get_case(case_id)
+        summary = await _case_summary_snapshot(case)
+        risk = await risk_service.latest(case_id)
+        delta = await risk_service.delta(case_id)
+        factors = await risk_service.factors(case_id, risk.assessment_id if risk else None)
+        patterns = await pattern_service.list(case_id, case.latest_trace.trace_id if case.latest_trace else None)
+        related = await repo.related_cases(case_id)
+        timeline = await repo.timeline(case_id)
+        alerts = await repo.alerts(case_id)
+        candidates = await _case_vasp_candidates(case.latest_trace)
+        nearest = candidates[0].model_dump(mode="json") if candidates else (summary.vasp_exposure.get("nearest") if summary.vasp_exposure else None)
+        cross_chain = (await cross_chain_service.summary(case_id)).model_dump(mode="json")
+        screenings = await repo.case_screenings(case_id)
+        threat_context = {
+            "status": "NO_DATA" if not screenings else "READY",
+            "results": [item.model_dump(mode="json") for item in screenings[:20]],
+            "interpretation": "Source-backed screening results are separate from on-chain facts and investigative risk."
+        }
+        intervention = calculate_intervention_priority(risk, delta, summary.active_watches > 0, nearest, len(related), alerts, cross_chain)
+        trace_summary = {"status": "NO DATA"}
+        if case.latest_trace:
+            observed_by_asset: dict[str, float] = {}
+            for edge in case.latest_trace.edges:
+                try:
+                    observed_by_asset[edge.transfer.asset] = observed_by_asset.get(edge.transfer.asset, 0.0) + float(edge.transfer.amount)
+                except (TypeError, ValueError):
+                    observed_by_asset.setdefault(edge.transfer.asset, 0.0)
+            trace_summary = case.latest_trace.metrics.model_dump(mode="json") | {
+                "trace_id": case.latest_trace.trace_id,
+                "mode": case.latest_trace.mode,
+                "provider": case.latest_trace.provider,
+                "source_wallet": case.latest_trace.root_address,
+                "wallets_traced": case.latest_trace.metrics.unique_wallet_count,
+                "transactions": case.latest_trace.metrics.unique_transaction_count,
+                "chains_observed": sorted({edge.transfer.chain.value for edge in case.latest_trace.edges}),
+                "observed_value_by_asset": observed_by_asset,
+            }
+        recommendations = []
+        if nearest:
+            recommendations.append({"priority": 1, "title": "Review nearest VASP candidate", "reason": f"{nearest.get('hop_distance', 'unknown')}-hop source-backed attribution with {nearest.get('attribution_confidence', nearest.get('confidence', 'unknown'))} confidence.", "references": nearest.get("evidence_ids", []) or (summary.risk.evidence_ids if summary.risk else []), "target": nearest.get("entity_id")})
+        if related:
+            recommendations.append({"priority": 2, "title": "Review related cases", "reason": f"{len(related)} exact persisted overlap(s) found in the case registry.", "references": [item.link_id for item in related], "target": "case-fusion"})
+        if delta and delta.delta > 0:
+            recommendations.append({"priority": 3, "title": "Continue watch and review new activity", "reason": f"Persisted risk posture increased by {delta.delta:g} points.", "references": risk.evidence_ids if risk else [], "target": "realtime"})
+        return CaseIntelligenceSnapshot(
+            case=case.model_dump(mode="json"),
+            trace_summary=trace_summary,
+            risk=risk, risk_delta=delta, top_risk_factors=sorted(factors, key=lambda item: item.contribution, reverse=True)[:8],
+            top_patterns=[item.model_dump(mode="json") for item in sorted(patterns, key=lambda item: item.severity, reverse=True)[:8]], nearest_vasp=nearest,
+            cross_chain_summary=cross_chain,
+            related_cases_summary={"count": len(related), "links": [item.model_dump(mode="json") for item in related]},
+            watch_state={"active": summary.active_watches > 0, "count": summary.active_watches}, latest_activity=timeline[0].model_dump(mode="json") if timeline else None,
+            latest_alert=alerts[0].model_dump(mode="json") if alerts else None, intervention_priority=intervention,
+            threat_intelligence=threat_context, recommended_actions=recommendations, generated_at=datetime.now(timezone.utc)
+        )
+    except DatabaseError as exc:
+        return database_failure(exc)
+
 @app.get("/api/v1/wallets/{chain}/{address}",response_model=WalletIntelligence)
 async def wallet_intelligence(chain: str, address: str):
     try:
@@ -825,6 +986,51 @@ async def wallet_intelligence(chain: str, address: str):
         return result
     except ValueError as exc: raise HTTPException(422,str(exc)) from exc
     except DatabaseError as exc: return database_failure(exc)
+
+@app.get("/api/v1/risk-registry/search", response_model=RiskRegistryResponse)
+async def risk_registry_search(q: str = "", kind: str = "ALL", limit: int = 50):
+    if len(q) > 200:
+        raise HTTPException(422, "q must be 200 characters or fewer")
+    if limit < 1 or limit > 200:
+        raise HTTPException(422, "limit must be between 1 and 200")
+    try:
+        return await repo.risk_registry_search(q, kind, limit)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/risk-registry/wallets/{chain}/{address}", response_model=RiskRegistryEntry)
+async def risk_registry_wallet(chain: str, address: str):
+    try:
+        selected_chain = Chain(chain.lower())
+        normalized = normalize_address(selected_chain, address)
+        WalletCreate(address=normalized, chain=selected_chain)
+        result = await repo.risk_registry_wallet(selected_chain, normalized)
+        if not result:
+            raise HTTPException(404, "Wallet has no persisted investigation record")
+        return result
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/cases/{case_id}/fusion", response_model=CaseFusionResponse)
+async def case_fusion(case_id: str):
+    await get_case(case_id)
+    try:
+        return await case_fusion_service.for_case(case_id)
+    except KeyError:
+        raise HTTPException(404, "No persisted case fingerprint is available")
+    except DatabaseError as exc:
+        return database_failure(exc)
+
+@app.get("/api/v1/case-fusion/clusters", response_model=CaseFusionClustersResponse)
+async def case_fusion_clusters():
+    try:
+        return await case_fusion_service.clusters()
+    except DatabaseError as exc:
+        return database_failure(exc)
 
 @app.get("/api/v1/cases/{case_id}/evidence",response_model=list[Evidence])
 async def case_evidence(case_id: str):
@@ -1008,6 +1214,131 @@ async def _case_attributions(trace: TraceResult):
             extra={"error_type": type(exc).__name__, "detail": str(exc)[:200]}
         )
         return []
+
+_CONFIDENCE_RANK = {ConfidenceLevel.UNKNOWN: 0, ConfidenceLevel.LOW: 1, ConfidenceLevel.MEDIUM: 2, ConfidenceLevel.HIGH: 3, ConfidenceLevel.CONFIRMED: 4}
+
+async def _case_vasp_candidates(trace: TraceResult | None) -> list[VaspCandidate]:
+    """Rank only source-backed VASP/exchange observations reached by the persisted trace."""
+    if not trace:
+        return []
+    nearest = await _case_attributions(trace)
+    ranked = []
+    seen = set()
+    for item in nearest:
+        if item.entity.entity_type not in {EntityType.VASP, EntityType.EXCHANGE, EntityType.CUSTODIAL_SERVICE}:
+            continue
+        key = (item.entity.entity_id, item.chain.value, item.address.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        path_edges = item.path.edges
+        asset_totals: dict[str, float] = {}
+        for edge in path_edges:
+            try:
+                asset_totals[edge.transfer.asset] = asset_totals.get(edge.transfer.asset, 0.0) + float(edge.transfer.amount)
+            except (TypeError, ValueError):
+                asset_totals.setdefault(edge.transfer.asset, 0.0)
+        asset = max(asset_totals, key=asset_totals.get) if asset_totals else "UNKNOWN"
+        amount = f"{asset_totals[asset]:g} {asset}" if asset in asset_totals and asset_totals[asset] else "UNKNOWN"
+        source_quality = max((source.reliability_level for source in item.supporting_sources), key=lambda value: _CONFIDENCE_RANK[value], default=ConfidenceLevel.UNKNOWN)
+        source = ", ".join(dict.fromkeys(record.source_reference for record in item.supporting_attributions if record.source_reference)) or "UNKNOWN"
+        source_version = ", ".join(dict.fromkeys(source.dataset_version for source in item.supporting_sources if source.dataset_version)) or "UNKNOWN"
+        classification = {ConfidenceLevel.CONFIRMED: "SOURCE_CONFIRMED", ConfidenceLevel.HIGH: "PROBABLE", ConfidenceLevel.MEDIUM: "LOW_CONFIDENCE", ConfidenceLevel.LOW: "LOW_CONFIDENCE", ConfidenceLevel.UNKNOWN: "UNRESOLVED"}[item.confidence]
+        reasons = [f"Shortest observed attributed path is {item.hop_distance} hop(s).", f"Attribution is {item.confidence.value.lower()} confidence from persisted source records."]
+        if source_quality in {ConfidenceLevel.HIGH, ConfidenceLevel.CONFIRMED}: reasons.append(f"Source quality is {source_quality.value.lower()}.")
+        if amount != "UNKNOWN": reasons.append(f"Observed linked flow along path: {amount}.")
+        ranked.append((item.hop_distance, -_CONFIDENCE_RANK[item.confidence], -asset_totals.get(asset, 0.0), item.entity.name, VaspCandidate(rank=0, entity_id=item.entity.entity_id, entity_name=item.entity.name, entity_type=item.entity.entity_type, address=item.address, chain=item.chain, hop_distance=item.hop_distance, observed_linked_amount=amount, observed_asset=asset, attribution_confidence=item.confidence, source_quality=source_quality, attribution_source=source, source_version=source_version, evidence_path=[edge.transaction_hash for edge in path_edges if edge.transaction_hash], transaction_hashes=[edge.transaction_hash for edge in path_edges if edge.transaction_hash], evidence_ids=sorted({e.evidence_id for e in item.evidence}), reasons=reasons, classification=classification)))
+    ranked.sort(key=lambda value: value[:4])
+    return [candidate.model_copy(update={"rank": index}) for index, (_, _, _, _, candidate) in enumerate(ranked, start=1)]
+
+def _unresolved_vasp_candidate(trace: TraceResult | None) -> VaspCandidate:
+    chain = trace.edges[0].transfer.chain if trace and trace.edges else Chain.ETHEREUM
+    address = trace.root_address if trace else ""
+    reasons = ["attribution unavailable", "no labelled custodial endpoint"]
+    if not trace:
+        reasons = ["no persisted trace", "trace depth exhausted"]
+    return VaspCandidate(rank=0, entity_id="UNRESOLVED", entity_name="UNRESOLVED", entity_type=EntityType.UNKNOWN, address=address, chain=chain, hop_distance=0, attribution_source="UNKNOWN", reasons=reasons, classification="UNRESOLVED")
+
+def calculate_intervention_priority(
+    risk: RiskAssessment | None,
+    delta: RiskDelta | None,
+    watch_active: bool,
+    nearest_vasp: dict | None,
+    related_case_count: int,
+    alerts: list[Alert | RiskAlertCandidate],
+    cross_chain_summary: dict,
+) -> InterventionPriority:
+    """Calculate review urgency from persisted signals with an inspectable formula."""
+    score = 0.0
+    reasons: list[str] = []
+    inputs = {
+        "risk_band": risk.band.value if risk else None,
+        "risk_score": risk.score if risk else None,
+        "risk_delta": delta.delta if delta else None,
+        "watch_active": watch_active,
+        "vasp_hop_distance": nearest_vasp.get("hop_distance") if nearest_vasp else None,
+        "vasp_confidence": nearest_vasp.get("attribution_confidence", nearest_vasp.get("confidence")) if nearest_vasp else None,
+        "related_case_count": related_case_count,
+        "open_critical_alerts": sum(1 for item in alerts if getattr(item, "severity", None) in {RiskBand.CRITICAL, "CRITICAL"} and getattr(item, "status", "NEW") == "NEW"),
+        "cross_chain_status": cross_chain_summary.get("status"),
+    }
+    band_points = {RiskBand.CRITICAL: 40, RiskBand.HIGH: 30, RiskBand.ELEVATED: 20, RiskBand.LOW: 10}
+    if risk and risk.band in band_points:
+        score += band_points[risk.band]
+        reasons.append(f"{risk.band.value} risk posture")
+    if delta and delta.delta > 0:
+        points = min(20.0, delta.delta)
+        score += points
+        reasons.append(f"risk increased +{delta.delta:g}")
+    if watch_active:
+        score += 15
+        reasons.append("active wallet watch")
+    if nearest_vasp:
+        confidence = str(nearest_vasp.get("attribution_confidence", nearest_vasp.get("confidence", "UNKNOWN"))).upper()
+        confidence_points = {"CONFIRMED": 15, "HIGH": 15, "MEDIUM": 8}.get(confidence, 0)
+        score += confidence_points
+        if confidence_points:
+            reasons.append(f"{confidence.lower()} source-backed VASP candidate")
+        if nearest_vasp.get("hop_distance") is not None and nearest_vasp["hop_distance"] <= 4:
+            score += 8
+            reasons.append(f"{nearest_vasp['hop_distance']}-hop custodial endpoint")
+        if nearest_vasp.get("observed_linked_amount") not in {None, "UNKNOWN"}:
+            reasons.append(f"{nearest_vasp['observed_linked_amount']} observed linked flow")
+    if related_case_count:
+        score += min(10.0, related_case_count * 3.0)
+        reasons.append(f"{related_case_count} exact related case(s)")
+    critical_alerts = inputs["open_critical_alerts"]
+    if critical_alerts:
+        score += min(15.0, critical_alerts * 15.0)
+        reasons.append(f"{critical_alerts} open critical alert(s)")
+    if cross_chain_summary.get("status") == "ANALYZED":
+        score += 5
+        reasons.append("cross-chain continuation assessed")
+    score = min(100.0, score)
+    level = "VERY_HIGH" if score >= 70 else "HIGH" if score >= 50 else "MODERATE" if score >= 25 else "LOW"
+    if not reasons:
+        reasons.append("No persisted intervention signals are available.")
+    return InterventionPriority(level=level, score=round(score, 2), reasons=reasons, inputs=inputs, calculated_at=datetime.now(timezone.utc))
+
+async def _seed_fixture_cross_chain(case_id: str, spec: dict, trace: TraceResult, analyze: bool = True):
+    """Route the development bridge scenario through the real cross-chain boundary."""
+    if not spec.get("cross_chain") or len(trace.edges) < 4:
+        return None
+    cross_chain_service.enable_development_fixture_bridge()
+    bridge_edge = trace.edges[2]
+    observation = CrossChainObservationCreate(
+        transfer=bridge_edge.transfer.model_copy(update={"provider": "DEVELOPMENT SYNTHETIC"}),
+        mode=DataMode.DEVELOPMENT_FIXTURE,
+        bridge_contract="0x7777777777777777777777777777777777777777",
+        message_id=f"{spec['reference']}-MESSAGE-001",
+        destination_chain=Chain.TRON,
+        destination_address=spec["addresses"][3],
+        source="DEVELOPMENT_SYNTHETIC",
+    )
+    await cross_chain_service.ingest_observation(case_id, observation)
+    if not analyze:
+        return None
+    return await cross_chain_service.analyze(case_id, CrossChainAnalyzeRequest(root_chain=Chain.ETHEREUM, root_address=trace.root_address, chains=[Chain.ETHEREUM, Chain.TRON], max_hops=8, max_cross_chain_hops=2))
 
 async def _case_summary_snapshot(case: InvestigationCase) -> CaseSummarySnapshot:
     log = logging.getLogger("crypto_fraud_intelligence")

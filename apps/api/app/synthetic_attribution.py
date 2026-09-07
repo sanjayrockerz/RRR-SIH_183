@@ -54,6 +54,18 @@ def registry() -> tuple[list[Entity], list[AttributionSource], list[AddressAttri
                 "last_observed": _LAST_OBSERVED.isoformat(),
                 "evidence": "Deterministic synthetic scenario terminal address",
             },
+        ), AddressAttribution(
+            attribution_id="10000000-0000-0000-0000-000000000004",
+            chain=Chain.TRON,
+            address=DEMO_VASP_ADDRESS,
+            entity_id=DEMO_ENTITY_ID,
+            role=AttributionRole.DEPOSIT_ADDRESS,
+            confidence=ConfidenceLevel.HIGH,
+            source_id=DEMO_SOURCE_ID,
+            source_reference="synthetic://vasp-registry/2026-08",
+            first_seen=_FIRST_OBSERVED,
+            last_verified=_LAST_OBSERVED,
+            metadata={"mode":"DEVELOPMENT_SYNTHETIC","evidence":"Deterministic synthetic cross-chain terminal address"},
         )],
     )
 

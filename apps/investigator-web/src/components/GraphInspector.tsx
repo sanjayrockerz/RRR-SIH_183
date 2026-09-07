@@ -147,7 +147,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   }, [asset, visibleFlow.edges, flaggedOnly, riskTransactions]);
 
   const visibleAddresses = new Set(visibleEdges.flatMap(item => [identity(item.transfer.chain, item.source), identity(item.transfer.chain, item.target)]));
-  const visibleNodes = visibleFlow.nodes.filter(item => visibleAddresses.has(identity(item.chain, item.address)) || item.address.toLowerCase() === trace.root_address.toLowerCase());
+  const visibleAddressOnly = new Set(visibleEdges.flatMap(item => [item.source.toLowerCase(), item.target.toLowerCase()]));
+  const visibleNodes = visibleFlow.nodes.filter(item => visibleAddresses.has(identity(item.chain, item.address)) || visibleAddressOnly.has(item.address.toLowerCase()) || item.address.toLowerCase() === trace.root_address.toLowerCase());
 
   const defaultPositions = useMemo(() => {
     return layout(visibleNodes, visibleEdges, trace.root_address);
@@ -155,7 +156,7 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
 
   const point = (address: string, chain?: string) => {
     const key = identity(chain, address);
-    return customPositions[key] || defaultPositions.get(key) || { x: 0, y: 0 };
+    return customPositions[key] || defaultPositions.get(key) || customPositions[Object.keys(customPositions).find(k => k.endsWith(`:${address.toLowerCase()}`) || k.endsWith(`:${address}`)) || ''] || Array.from(defaultPositions.entries()).find(([k]) => k.endsWith(`:${address.toLowerCase()}`) || k.endsWith(`:${address}`))?.[1] || { x: 0, y: 0 };
   };
 
   const primaryTransactions = new Set(primaryPath?.transaction_hashes || []);
@@ -381,7 +382,8 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                         )}
                         <line x1={source.x} y1={source.y} x2={target.x} y2={target.y} markerEnd="url(#graph-arrow)" stroke={isPathRisk ? '#ff8a65' : isPrimary ? '#4de1c1' : selected ? '#3b82f6' : bearing ? '#f59e0b' : '#4b5563'} strokeWidth={isPrimary ? 5 : selected ? 3 : bearing ? 3.5 : 1.5} opacity={isPrimary || bearing ? 1 : 0.45} />
                         <rect x={(source.x + target.x) / 2 - 40} y={(source.y + target.y) / 2 - 10} width="80" height="20" rx="3" fill="#111827" stroke="#374151" strokeWidth="1" />
-                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 4} textAnchor="middle" fill={isPrimary ? '#b8fff0' : bearing ? '#fef3c7' : '#9ca3af'} fontSize="10">{isPrimary ? `H${item.hop} ` : ''}{formatAmount(item.transfer.amount)} {item.transfer.asset}</text>
+                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 1} textAnchor="middle" fill={isPrimary ? '#b8fff0' : bearing ? '#fef3c7' : '#9ca3af'} fontSize="10">{isPrimary ? `H${item.hop} ` : ''}{formatAmount(item.transfer.amount)} {item.transfer.asset}</text>
+                        <text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 + 12} textAnchor="middle" fill="#87a8b7" fontSize="8">{String(item.transfer.chain).toUpperCase()}</text>
                       </g>
                     );
                   })}
@@ -417,8 +419,9 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
                       >
                         <circle r={isRoot ? 32 : 26} fill={isRoot ? '#1e3a8a' : isCollapsed ? '#5b21b6' : isContract ? '#065f46' : '#1f2937'} stroke={selected ? '#3b82f6' : nodeRisk ? '#ef4444' : '#4b5563'} strokeWidth="2" />
                         <circle className="node-core" r={isRoot ? 24 : 18} fill="#0f172a" />
-                        <text className="node-type" textAnchor="middle" y="4" fill="#e5e7eb" fontSize="8" fontWeight="bold">{isRoot ? 'ROOT' : isTerminal ? primaryPath?.terminal_entity_type : isContract ? 'CONTRACT' : 'WALLET'}</text>
-                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="500">{isTerminal ? primaryPath?.terminal_entity_name : short(item.address)}</text>
+                        <text className="node-type" textAnchor="middle" y="4" fill="#e5e7eb" fontSize="8" fontWeight="bold">{isRoot ? 'ROOT' : isTerminal ? 'VASP' : item.node_type || (isContract ? 'CONTRACT' : 'WALLET')}</text>
+                        <text className="node-label" textAnchor="middle" y="44" fill="#f3f4f6" fontSize="10" fontWeight="500">{isTerminal ? primaryPath?.terminal_entity_name : item.metadata?.label || short(item.address)}</text>
+                        <text textAnchor="middle" y="56" fill="#87a8b7" fontSize="8">{String(item.chain || 'ethereum').toUpperCase()} · {short(item.address)}</text>
                       </g>
                     );
                   })}

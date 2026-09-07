@@ -18,6 +18,9 @@ import { RunInvestigationDemo } from './components/RunInvestigationDemo';
 import { TransactionLedger } from './components/TransactionLedger';
 import { CaseCommandCenter } from './components/CaseCommandCenter';
 import { OperationalDashboard } from './components/OperationalDashboard';
+import { VaspIntelligencePage } from './components/VaspIntelligencePage';
+import { RiskRegistryPage } from './components/RiskRegistryPage';
+import { CaseFusionPage } from './components/CaseFusionPage';
 import { api, caseScreenings, intelligenceSources, screenCase, systemStatus } from './api';
 import type { AddressScreening, Case, IntelligenceSource, Trace, InvestigationOperationalState } from './types';
 import { Dashboard, GenericPage, Intake, Workspace, CasesPage, WalletsPage, EntitiesPage, EvidencePage, AlertsPage, ProviderOperationsPage } from './pages';
@@ -35,7 +38,8 @@ const caseRouteAliases: Record<string, string> = {
   realtime: 'monitoring',
   monitoring: 'monitoring',
   entities: 'entities',
-  vasp: 'entities',
+  vasp: 'vasp-intelligence',
+  'vasp-intelligence': 'vasp-intelligence',
   'cross-chain': 'cross-chain',
   'threat-intelligence': 'threat-intelligence',
   sanctions: 'sanctions',
@@ -53,6 +57,7 @@ const caseRouteLabels: Record<string, string> = {
   risk: 'risk',
   monitoring: 'realtime',
   entities: 'entities',
+  'vasp-intelligence': 'vasp-intelligence',
   'cross-chain': 'cross-chain',
   'threat-intelligence': 'threat-intelligence',
   sanctions: 'sanctions',
@@ -265,6 +270,8 @@ export default function App() {
       }
     } else if (activeRoute === 'entities') {
       subContent = <CaseEntitiesWorkspace state={opState} />;
+    } else if (activeRoute === 'vasp-intelligence') {
+      subContent = <VaspIntelligencePage caseId={caseData.case_id} />;
     } else if (activeRoute === 'threat-intelligence') {
       subContent = <ThreatWorkspace caseData={caseData} />;
     } else if (activeRoute === 'sanctions') {
@@ -381,7 +388,10 @@ export default function App() {
     else if (activeRoute === 'realtime') page = <><SyntheticRealtimeControl /><LiveIntelligence /></>;
     else if (activeRoute === 'cases') page = <CasesPage onNavigate={navigate} onOpenCase={openCase} />;
     else if (activeRoute === 'wallets') page = <WalletsPage />;
+    else if (activeRoute === 'risk-registry') page = <RiskRegistryPage onOpenCase={openCase} />;
+    else if (activeRoute === 'case-fusion') page = <CaseFusionPage onOpenCase={openCase} />;
     else if (activeRoute === 'entities') page = <EntitiesPage />;
+    else if (activeRoute === 'vasp-intelligence') page = <VaspIntelligencePage caseId={caseData?.case_id} />;
     else if (activeRoute === 'alerts') page = <AlertsPage />;
     else if (activeRoute === 'operations') page = <ProviderOperationsPage />;
     else page = <OperationalDashboard onNavigate={navigate} onOpenCase={openCase} />;

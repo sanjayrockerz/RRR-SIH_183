@@ -23,5 +23,6 @@ import './run-demo.css';
 import './ledger.css';
 import './case-command.css';
 import './operations.css';
+import './shell-premium.css';
 
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

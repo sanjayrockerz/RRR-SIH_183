@@ -51,6 +51,22 @@ def select_primary_path(trace: TraceResult, entities, sources, records) -> dict:
     The path is built from persisted directed transfers. Attribution only selects
     an endpoint; it never changes the underlying observed edges.
     """
+    # Development fixtures carry an explicit ordered path. It is authoritative
+    # and prevents row order or frontend traversal from changing the investigation.
+    if trace.predominant_path:
+        ordered=[]
+        for source, target in zip(trace.predominant_path, trace.predominant_path[1:]):
+            edge=next((item for item in trace.edges if item.source.lower()==source.lower() and item.target.lower()==target.lower()), None)
+            if edge is None: raise ValueError("Persisted predominant path references a missing directed edge")
+            ordered.append(edge)
+        node_by_address={node.address.lower():node for node in trace.nodes}
+        terminal=node_by_address.get(trace.predominant_path[-1].lower())
+        engine=AttributionEngine(entities, sources, records)
+        resolved=engine.resolve(terminal.chain, terminal.address) if terminal else None
+        candidate=next((item for item in (resolved.candidates if resolved else []) if item.entity.entity_type in _TERMINAL_TYPES), None)
+        if not terminal or not candidate: raise ValueError("Predominant fixture endpoint lacks VASP attribution")
+        role=candidate.attributions[0].role if candidate.attributions else AttributionRole.UNKNOWN
+        return {"status":"ATTRIBUTED","root_address":trace.root_address,"node_ids":trace.predominant_path,"transaction_hashes":[e.transaction_hash for e in ordered],"hops":len(ordered),"edge_ids":[e.edge_id for e in ordered],**_path_measurements(ordered),"terminal_address":terminal.address,"terminal_entity_id":candidate.entity.entity_id,"terminal_entity_name":candidate.entity.name,"terminal_entity_type":candidate.entity.entity_type,"terminal_role":role,"attribution":candidate.confidence,"why":"Explicit DEVELOPMENT_SYNTHETIC predominant path; directed edge continuity is preserved and traversal stops at the attributed VASP endpoint.","evidence_ids":sorted({e.evidence_id for e in ordered if e.evidence_id}),"attribution_records":[item.attribution_id for item in candidate.attributions]}
     paths = _paths_from_root(trace)
     node_by_key = {_key(node.chain, node.address): node for node in trace.nodes}
     engine = AttributionEngine(entities, sources, records)

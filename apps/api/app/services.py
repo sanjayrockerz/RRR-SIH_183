@@ -86,6 +86,8 @@ class CaseRepository:
     async def list_reports(self, case_id: str) -> list[InvestigationReport]: raise NotImplementedError
     async def get_report(self, case_id: str, report_id: str) -> InvestigationReport | None: raise NotImplementedError
     async def related_cases(self, case_id: str) -> list[CaseLink]: raise NotImplementedError
+    async def case_fusion_fingerprints(self, case_id: str | None = None) -> list[CaseFingerprint]: raise NotImplementedError
+    async def risk_registry_wallet(self, chain: Chain, address: str) -> RiskRegistryEntry | None: raise NotImplementedError
     async def intelligence_sources(self) -> list[IntelligenceSource]: raise NotImplementedError
     async def threat_indicators(self, chain: Chain | None = None) -> list[ThreatIndicator]: raise NotImplementedError
     async def contract_security_findings(self, chain: Chain, address: str) -> list[ContractSecurityFinding]: raise NotImplementedError

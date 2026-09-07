@@ -26,10 +26,21 @@ class CrossChainService:
     def __init__(self, repository, bridge_definitions: list[BridgeDefinition] | None = None, chain_registry: ChainRegistry | None = None):
         self.repository=repository
         self.chain_registry=chain_registry or ChainRegistry.default()
-        self.bridge_registry=BridgeRegistry(bridge_definitions if bridge_definitions is not None else load_bridge_definitions(settings.bridge_registry_file))
+        definitions = bridge_definitions if bridge_definitions is not None else load_bridge_definitions(settings.bridge_registry_file)
+        if not definitions and settings.blockchain_data_mode.upper() == DataMode.DEVELOPMENT_FIXTURE.value:
+            definitions = [BridgeDefinition(bridge_id="DEVELOPMENT_SYNTHETIC_BRIDGE", name="Development Synthetic Bridge", supported_chains=[Chain.ETHEREUM, Chain.TRON], deposit_contracts={Chain.ETHEREUM: ["0x7777777777777777777777777777777777777777"]}, withdrawal_contracts={}, router_contracts={}, source="DEVELOPMENT_SYNTHETIC", version="development-fixture-v1")]
+        self.bridge_registry=BridgeRegistry(definitions)
         self.bridge_detector=BridgeDetectionEngine(self.bridge_registry)
         self.correlation=CrossChainCorrelationEngine()
         self.graph_builder=CrossChainGraphBuilder(self.chain_registry)
+
+    def enable_development_fixture_bridge(self):
+        """Add only the explicitly requested demo bridge to the in-process registry."""
+        if any(item.bridge_id == "DEVELOPMENT_SYNTHETIC_BRIDGE" for item in self.bridge_registry.list()):
+            return
+        definitions = self.bridge_registry.list() + [BridgeDefinition(bridge_id="DEVELOPMENT_SYNTHETIC_BRIDGE", name="Development Synthetic Bridge", supported_chains=[Chain.ETHEREUM, Chain.TRON], deposit_contracts={Chain.ETHEREUM: ["0x7777777777777777777777777777777777777777"]}, source="DEVELOPMENT_SYNTHETIC", version="development-fixture-v1")]
+        self.bridge_registry = BridgeRegistry(definitions)
+        self.bridge_detector = BridgeDetectionEngine(self.bridge_registry)
 
     def capabilities(self): return self.chain_registry.list()
     def bridge_definitions(self): return self.bridge_registry.list()

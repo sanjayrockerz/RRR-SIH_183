@@ -91,6 +91,143 @@ class DashboardSummary(BaseModel):
     latest_risk_change: dict | None = None
     latest_alert: dict | None = None
 
+class PriorityCase(BaseModel):
+    case_id: str
+    title: str
+    external_case_reference: str | None = None
+    fraud_type: str
+    status: str
+    workflow_stage: CaseWorkflowStage = CaseWorkflowStage.NEW
+    risk_band: str | None = None
+    risk_score: float | None = None
+    risk_delta: float = 0
+    watch_state: str = "NOT_CONFIGURED"
+    latest_activity_at: datetime | None = None
+    vasp_lead_count: int = 0
+    nearest_vasp: dict | None = None
+    related_case_count: int = 0
+    open_critical_alerts: int = 0
+    priority_rank: int = 0
+    priority_reason: str = "No persisted priority signals are available."
+    intervention_priority: 'InterventionPriority | None' = None
+
+class InterventionPriority(BaseModel):
+    """Explainable review urgency; not a recovery or outcome probability."""
+    level: str
+    score: float = Field(ge=0, le=100)
+    reasons: list[str] = []
+    inputs: dict = {}
+    formula_version: str = "intervention-priority-v1"
+    calculated_at: datetime
+
+class DashboardIntelligence(BaseModel):
+    status: str = "READY"
+    critical_cases: int = 0
+    active_watches: int = 0
+    vasp_leads: int = 0
+    high_confidence_vasp_leads: int = 0
+    cross_chain_cases: int = 0
+    unresolved_cross_chain_cases: int = 0
+    related_case_clusters: int = 0
+    open_alerts: int = 0
+    critical_alerts: int = 0
+    priority_cases: list[PriorityCase] = []
+    recent_intelligence_events: list[dict] = []
+    risk_movements: list[dict] = []
+    risk_factor_summary: list[dict] = []
+    provider_state: dict = {}
+    generated_at: datetime
+
+class CaseIntelligenceSnapshot(BaseModel):
+    case: dict
+    trace_summary: dict
+    risk: 'RiskAssessment | None' = None
+    risk_delta: 'RiskDelta | None' = None
+    top_risk_factors: list['RiskFactor'] = []
+    top_patterns: list[dict] = []
+    nearest_vasp: dict | None = None
+    cross_chain_summary: dict = {}
+    related_cases_summary: dict = {}
+    watch_state: dict = {}
+    latest_activity: dict | None = None
+    latest_alert: dict | None = None
+    intervention_priority: InterventionPriority | None = None
+    threat_intelligence: dict = {}
+    recommended_actions: list[dict] = []
+    generated_at: datetime
+
+class VaspCandidate(BaseModel):
+    rank: int
+    entity_id: str
+    entity_name: str
+    entity_type: EntityType
+    address: str
+    chain: Chain
+    hop_distance: int
+    observed_linked_amount: str = "UNKNOWN"
+    observed_asset: str = "UNKNOWN"
+    attribution_confidence: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+    source_quality: ConfidenceLevel = ConfidenceLevel.UNKNOWN
+    attribution_source: str = "UNKNOWN"
+    source_version: str = "UNKNOWN"
+    evidence_path: list[str] = []
+    transaction_hashes: list[str] = []
+    evidence_ids: list[str] = []
+    reasons: list[str] = []
+    classification: str = "UNRESOLVED"
+
+class VaspActionPackageRequest(BaseModel):
+    entity_id: str | None = None
+    address: str | None = None
+    created_by: str | None = Field(default=None, max_length=200)
+
+class VaspActionPackage(BaseModel):
+    package_id: str
+    report_id: str
+    manifest_id: str | None = None
+    case_id: str
+    case_reference: str | None = None
+    source_wallet: str | None = None
+    vasp_candidate: VaspCandidate | None = None
+    transaction_hashes: list[str] = []
+    evidence_ids: list[str] = []
+    evidence_manifest_hash: str | None = None
+    limitations: list[str] = []
+    recommended_next_step: str = "Investigator review recommended for appropriate VASP coordination."
+    generated_at: datetime
+
+class RiskRegistryEntry(BaseModel):
+    record_type: str
+    record_id: str
+    label: str
+    address: str | None = None
+    chain: Chain | None = None
+    observed_case_count: int = 0
+    trace_count: int = 0
+    transaction_count: int = 0
+    first_observed: datetime | None = None
+    last_observed: datetime | None = None
+    highest_investigative_risk: float | None = None
+    highest_investigative_risk_band: str | None = None
+    current_investigative_risk: float | None = None
+    current_investigative_risk_band: str | None = None
+    risk_history_references: list[str] = []
+    observed_patterns: list[str] = []
+    associated_entities: list[dict] = []
+    observed_roles: list[str] = []
+    related_vasps: list[str] = []
+    associated_bridges: list[str] = []
+    connected_case_ids: list[str] = []
+    threat_intelligence_status: str = "NOT_CONFIGURED"
+    evidence_count: int = 0
+    interpretation: str = "Persisted investigative history; not a criminal classification."
+
+class RiskRegistryResponse(BaseModel):
+    status: str
+    query: str = ""
+    entries: list[RiskRegistryEntry] = []
+    generated_at: datetime
+
 class CaseSummarySnapshot(BaseModel):
     case_id: str
     status: str
@@ -364,6 +501,52 @@ class CaseLink(BaseModel):
     explanation: str
     created_at: datetime
 
+class CaseFingerprint(BaseModel):
+    case_id: str
+    wallet_ids: list[str] = []
+    transaction_ids: list[str] = []
+    entity_ids: list[str] = []
+    vasp_ids: list[str] = []
+    bridge_ids: list[str] = []
+    chains: list[str] = []
+    pattern_types: list[str] = []
+    first_activity: datetime | None = None
+    last_activity: datetime | None = None
+    burst_profile: dict = {}
+    wallets: list[dict] = []
+    vasps: list[dict] = []
+    bridges: list[dict] = []
+
+class CaseFusionRelation(BaseModel):
+    related_case_id: str
+    relationship: str
+    score: float = Field(ge=0, le=1)
+    shared_wallets: list[dict] = []
+    shared_transactions: list[dict] = []
+    shared_vasps: list[dict] = []
+    shared_bridges: list[dict] = []
+    shared_patterns: list[str] = []
+    reasons: list[str] = []
+
+class CaseFusionResponse(BaseModel):
+    case_id: str
+    fingerprint: CaseFingerprint
+    related_cases: list[CaseFusionRelation] = []
+    limitations: list[str] = []
+
+class CaseFusionCluster(BaseModel):
+    cluster_id: str
+    case_ids: list[str] = []
+    relationship: str = "CONFIRMED_STRUCTURAL_OVERLAP"
+    score: float = Field(ge=0, le=1)
+    shared_infrastructure: list[str] = []
+    reasons: list[str] = []
+
+class CaseFusionClustersResponse(BaseModel):
+    status: str
+    clusters: list[CaseFusionCluster] = []
+    limitations: list[str] = []
+
 class TraceLimits(BaseModel):
     max_hops: int; max_nodes: int; max_edges: int; max_transactions: int; max_duration: int
 
@@ -387,6 +570,10 @@ class GraphNode(BaseModel):
     id: str; address: str; depth: int = 0; chain: Chain = Chain.ETHEREUM
     node_type: str = "WALLET"; first_seen: datetime | None = None; last_seen: datetime | None = None
     transaction_count: int = 0; metadata: dict = {}
+    entity_name: str | None = None; entity_type: str | None = None
+    risk_score: float = 0; risk_level: str = "LOW"
+    is_root: bool = False; is_endpoint: bool = False
+    position: dict[str, float] = {}
 
 class GraphEdge(BaseModel):
     source: str; target: str; transfer: Transfer; edge_id: str = ""; hop: int = 0
@@ -435,6 +622,9 @@ class TraceResult(BaseModel):
     trace_id: str = ""; status: str = "COMPLETED"; direction: TraceDirection = TraceDirection.FORWARD
     limits: TraceLimits | None = None; metrics: TraceMetrics = TraceMetrics()
     paths: list[TransactionPath] = []; flows: list[FundFlow] = []; acquisition: AcquisitionStatistics = AcquisitionStatistics()
+    # Explicit investigator-selected route. This is persisted for synthetic fixtures
+    # and is never inferred by the frontend from arbitrary graph traversal.
+    predominant_path: list[str] = []
 
 class InvestigationCase(BaseModel):
     case_id: str; title: str; fraud_type: str; priority: str; status: str

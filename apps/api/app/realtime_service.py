@@ -144,6 +144,16 @@ class RealtimeService:
         if case.latest_trace and case.latest_trace.trace_id:
             try:
                 attributions = await self._case_attributions(case.latest_trace)
+                vasp_candidates = [item for item in attributions if item.entity.entity_type in {EntityType.VASP, EntityType.EXCHANGE, EntityType.CUSTODIAL_SERVICE}]
+                if vasp_candidates:
+                    candidate = vasp_candidates[0]
+                    vasp_evidence = sorted({e.evidence_id for e in candidate.evidence})
+                    await self._publish("VASP_CANDIDATE_REFRESHED", application.event, case.case_id, {"entity_id": candidate.entity.entity_id, "entity_name": candidate.entity.name, "hop_distance": candidate.hop_distance, "confidence": candidate.confidence})
+                    await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()), case_id=case.case_id, timestamp=now, event_type="VASP_CANDIDATE_REFRESHED", summary=f"Source-backed {candidate.entity.entity_type} candidate refreshed at {candidate.hop_distance} observed hop(s); investigator review required.", source="AttributionEngine", evidence_ids=vasp_evidence, metadata={"entity_id": candidate.entity.entity_id, "confidence": candidate.confidence, "address": candidate.address}))
+                related_cases = await self.repository.related_cases(case.case_id)
+                if related_cases:
+                    await self._publish("CASE_FUSION_MATCH", application.event, case.case_id, {"related_case_count": len(related_cases), "link_ids": [item.link_id for item in related_cases]})
+                    await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()), case_id=case.case_id, timestamp=now, event_type="CASE_FUSION_MATCH", summary=f"{len(related_cases)} exact persisted case overlap(s) refreshed after new activity; shared infrastructure is an investigative lead only.", source="CaseFusion", evidence_ids=sorted({e.get("tx_hash") for item in related_cases for e in item.shared_transactions if e.get("tx_hash")} ), metadata={"link_ids": [item.link_id for item in related_cases], "relationship_types": [item.relationship_type for item in related_cases]}))
                 patterns = await self.pattern_service.analyze(case.latest_trace, PatternAnalyzeRequest(trace_id=case.latest_trace.trace_id), attributions)
                 if patterns:
                     await self._publish("PATTERN_DETECTED",application.event,case.case_id,{"pattern_count":len(patterns),"pattern_ids":[p.pattern_id for p in patterns]})

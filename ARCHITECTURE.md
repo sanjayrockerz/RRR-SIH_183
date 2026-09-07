@@ -46,6 +46,10 @@ Reports are immutable snapshots assembled by `ReportService` from persisted case
 
 The related-case query exposes only exact overlaps in persisted wallet or transaction identity. It is a derived investigative lead, not proof of common control or criminality. See [cross-case-intelligence.md](docs/architecture/cross-case-intelligence.md).
 
+## Operational intelligence
+
+The command center uses the PostgreSQL-backed Dashboard Intelligence read model at `/api/v1/dashboard/intelligence`. It ranks persisted cases using explainable risk, watch, alert, attribution, exact-overlap, and activity signals. The Case Intelligence Snapshot at `/api/v1/cases/{case_id}/intelligence` composes existing services for a dense investigator view and structured recommendations. These read models preserve the distinction between observed facts, source-backed attribution, algorithmic inference, and risk assessment. See [operational-intelligence.md](docs/architecture/operational-intelligence.md).
+
 ## Authentication boundary
 
 Authentication is an opt-in, backend-only JWT verification boundary. It accepts externally issued RS256/ES256 bearer tokens only when a trusted public key and `AUTH_REQUIRED=true` are configured. This does not yet provide case-level authorization or production SSO integration. See [authentication.md](docs/architecture/authentication.md).

@@ -1,0 +1,29 @@
+.shell-premium { background: #050b12; }
+.shell-premium .topbar { height: 76px; padding: 0 22px; gap: 22px; background: #06101a; border-bottom: 1px solid #193041; }
+.shell-premium .brand-button { min-width: 195px; gap: 10px; }
+.shell-premium .brand-mark { color: #19d3ff; font-size: 26px; }
+.shell-premium .brand-button b { color: #e8eef5; font-size: 22px; letter-spacing: .18em; }
+.shell-premium .brand-button small { color: #60778a; font-size: 9px; }
+.shell-premium .platform-title { display: grid; gap: 4px; min-width: 250px; }
+.shell-premium .platform-title strong { color: #b9e9f7; font-size: 17px; letter-spacing: .01em; }
+.shell-premium .platform-title > span { color: #91a4b7; font-size: 11px; }
+.shell-premium .platform-title nav { display: none; }
+.shell-premium .global-search { max-width: 320px; height: 36px; margin-left: auto; border-color: #193f55; border-radius: 5px; background: #081722; color: #60778a; }
+.shell-premium .global-search input { color: #e8eef5; font-size: 11px; }
+.shell-premium .global-search input::placeholder { color: #60778a; }
+.shell-premium .global-search kbd { color: #60778a; border-color: #193041; }
+.shell-premium .top-actions { gap: 10px; }
+.shell-premium .icon-button { width: 32px; height: 32px; border: 0; background: transparent; color: #91a4b7; font-size: 20px; cursor: pointer; }
+.shell-premium .alert-count { color: #60778a; font: 9px 'DM Mono', monospace; }
+.shell-premium .system-chip { border: 1px solid #193041; padding: 7px 9px; color: #91a4b7; }
+.shell-premium .system-chip.is-warning { color: #f5b942; border-color: rgba(245,185,66,.35); }
+.shell-premium .user { padding: 9px; background: #102b3b; border: 1px solid #1f6280; color: #b9e9f7; }
+.shell-premium .user-label { color: #dce8ef; font-size: 10px; line-height: 1.3; }.shell-premium .user-label small { color: #60778a; font-size: 9px; }
+.shell-premium .shell-body { min-height: calc(100vh - 76px); }
+.shell-premium .sidebar { width: 204px; min-height: calc(100vh - 76px); padding: 16px 10px; background: #06111a; border-right: 1px solid #193041; }
+.shell-premium .case-context { display: grid; gap: 6px; padding: 8px 10px 15px; margin-bottom: 8px; border-bottom: 1px solid #193041; }.shell-premium .case-context small, .shell-premium .case-context code { color: #60778a; font: 9px 'DM Mono', monospace; }.shell-premium .case-context strong { color: #c8d7e2; font-size: 11px; font-weight: 600; line-height: 1.35; }.shell-premium .case-state { color: #25d17f; font: 9px 'DM Mono', monospace; text-transform: uppercase; }.shell-premium .muted-state { color: #60778a; }
+.shell-premium .side-nav { display: grid; gap: 11px; margin-top: 0; }.shell-premium .nav-group { display: grid; gap: 2px; }.shell-premium .side-caption { padding: 6px 10px 5px; color: #60778a; font-size: 9px; }.shell-premium .nav-item { min-height: 33px; gap: 9px; padding: 7px 9px; border-radius: 5px; color: #91a4b7; font-size: 11px; }.shell-premium .nav-item:hover { background: #0b1d2b; color: #dce8ef; }.shell-premium .nav-item.active { background: #0c2b3d; color: #b8edff; box-shadow: inset 2px 0 #19d3ff; }.shell-premium .nav-icon { width: 17px; color: currentColor; font-size: 15px; }
+.shell-premium .sidebar-integrations { margin-top: 15px; border-top: 1px solid #193041; padding-top: 10px; }.shell-premium .integration-link { padding: 7px 10px; color: #91a4b7; font-size: 10px; }.shell-premium .integration-status { flex: 0 0 6px; width: 6px; height: 6px; }.shell-premium .sidebar-footer { padding: 12px 10px; border-top-color: #193041; color: #60778a; font-size: 9px; }.shell-premium .sidebar-footer b { color: #91a4b7; font-weight: 400; }
+.shell-premium .workspace { padding: 19px 22px 42px; background: #050b12; }.shell-premium .breadcrumbs { display: none; }
+@media (max-width: 1200px) { .shell-premium .platform-title { display: none; }.shell-premium .global-search { max-width: 360px; } }
+@media (max-width: 720px) { .shell-premium .topbar { height: 64px; padding: 0 12px; gap: 10px; }.shell-premium .brand-button { min-width: auto; }.shell-premium .brand-button b { font-size: 18px; }.shell-premium .brand-button small, .shell-premium .user-label, .shell-premium .alert-count, .shell-premium .global-search { display: none; }.shell-premium .sidebar { width: 58px; padding: 13px 6px; }.shell-premium .case-context, .shell-premium .side-caption, .shell-premium .nav-item > span:not(.nav-icon), .shell-premium .sidebar-integrations, .shell-premium .sidebar-footer { display: none; }.shell-premium .side-nav { gap: 4px; }.shell-premium .nav-group { gap: 2px; }.shell-premium .nav-item { justify-content: center; padding: 9px 3px; }.shell-premium .nav-icon { font-size: 17px; }.shell-premium .workspace { padding: 14px 10px 30px; } }
