@@ -52,7 +52,7 @@ export function CasesPage({onNavigate,onOpenCase}:{onNavigate:(route:string)=>vo
                   <td>{item.fraud_type}</td>
                   <td className="mono">{item.wallet_address ? `${item.wallet_address.slice(0, 8)}…${item.wallet_address.slice(-6)}` : 'No wallet'}</td>
                   <td>
-                    <span className={`status-badge ${item.status.toLowerCase()}`}>
+                    <span className={`status-badge ${(item.status || 'open').toLowerCase()}`}>
                       {item.status}
                     </span>
                   </td>

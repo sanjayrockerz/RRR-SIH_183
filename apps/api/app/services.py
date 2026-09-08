@@ -91,6 +91,9 @@ class CaseRepository:
     async def intelligence_sources(self) -> list[IntelligenceSource]: raise NotImplementedError
     async def threat_indicators(self, chain: Chain | None = None) -> list[ThreatIndicator]: raise NotImplementedError
     async def contract_security_findings(self, chain: Chain, address: str) -> list[ContractSecurityFinding]: raise NotImplementedError
+    async def save_workflow_state(self, case_id: str, state: InvestigationWorkflowState) -> InvestigationWorkflowState: raise NotImplementedError
+    async def get_workflow_state(self, case_id: str) -> InvestigationWorkflowState | None: raise NotImplementedError
+    async def update_workflow_stage(self, case_id: str, stage: str, stage_detail: WorkflowStageDetail) -> InvestigationWorkflowState: raise NotImplementedError
 
 class TraceService:
     def __init__(self,provider:BlockchainProvider, provider_registry=None):

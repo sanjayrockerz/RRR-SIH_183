@@ -98,7 +98,7 @@ export default function App() {
         return;
       }
       const integration = target.closest('.integration-link');
-      if (integration && integration.textContent?.includes('VASP')) {
+      if (integration && (integration.textContent || '').includes('VASP')) {
         location.hash = 'entities';
         return;
       }
@@ -545,7 +545,7 @@ function TimelineWorkspace({ state }: { state: InvestigationOperationalState | n
   return (
     <section className="surface">
       <div className="panel-title"><div className="eyebrow">CASE / TIMELINE</div><h3>{events.length ? `${events.length} workflow event(s)` : 'No workflow events loaded'}</h3></div>
-      {events.length ? events.map(event => <div className="timeline-row" key={event.event_id}><time>{new Date(event.completed_at || event.started_at).toLocaleString()}</time><div><strong>{event.stage.replaceAll('_',' ')}</strong><p>{event.provider || 'RRR'} | {event.result_count ?? 0} record(s)</p>{event.error && <small>{event.error}</small>}</div></div>) : <div className="empty-block"><b>No persisted workflow events</b><p>Timeline entries appear after case creation, acquisition, risk assessment, realtime processing, and report generation.</p></div>}
+      {events.length ? events.map(event => <div className="timeline-row" key={event.event_id}><time>{new Date(event.completed_at || event.started_at).toLocaleString()}</time><div><strong>{(event.stage || '').replaceAll('_',' ') || 'WORKFLOW STAGE'}</strong><p>{event.provider || 'RRR'} | {event.result_count ?? 0} record(s)</p>{event.error && <small>{event.error}</small>}</div></div>) : <div className="empty-block"><b>No persisted workflow events</b><p>Timeline entries appear after case creation, acquisition, risk assessment, realtime processing, and report generation.</p></div>}
     </section>
   );
 }

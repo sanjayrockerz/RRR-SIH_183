@@ -78,3 +78,83 @@ export type ChainCapability={chain_id:string;name:string;family:string;native_as
 export type CrossChainSummary={chains:string[];cross_chain_movements:number;bridge_interactions:number;new_wallets:number;unresolved_links:number;strong_or_exact_links:number;status:string};
 export type CrossChainLink={link_id:string;source:{chain:string;address:string};destination?:{chain:string;address:string};source_transaction_hash:string;destination_transaction_hash:string;bridge_id:string;correlation_id:string;correlation_level:string;confidence_score:number;confidence_band:string;evidence_count:number;correlation_reasons:string[];evidence_ids:string[];provenance_source:string;explanation:string;observed_or_inferred:string;created_at:string};
 export type CrossChainTrace={trace_id:string;case_id:string;root:{chain:string;address:string};chains_visited:string[];cross_chain_hops:number;cross_chain_links:CrossChainLink[];cross_chain_transfers?:{source_chain:string;destination_chain:string;source_tx:string;destination_tx:string;bridge_protocol:string;asset:string;amount:string;timestamp?:string;confidence:string;evidence_ids:string[];correlation_id:string;observed_or_inferred:string}[];primary_path?:{status:string;node_ids:string[];edge_ids:string[];chain_labels:string[];terminal_address?:string|null;terminal_entity_id?:string|null;terminal_entity_name:string;terminal_entity_type:string;attribution:string;hops:number;why:string;evidence_ids:string[];transaction_hashes:string[]}|null;nodes:{node_id:string;chain:string;address:string;node_type:string}[];edges:{edge_id:string;edge_type:string;source_node:string;destination_node:string;chain?:string;destination_chain?:string;transaction_hash?:string;destination_transaction_hash?:string;bridge_id?:string;link_id?:string;confidence_band?:string;observed_or_inferred:string;metadata:Record<string,unknown>}[];status:string;limitations:string[];provider_states:Capability[]};
+
+export type WorkflowStageStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+
+export type WorkflowStageDetail = {
+  stage: string;
+  status: WorkflowStageStatus;
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+  evidence_references?: string[];
+  output_summary?: Record<string, any>;
+};
+
+export type VaspActionabilityCandidate = {
+  vasp_name: string;
+  entity_id?: string;
+  deposit_address?: string;
+  score: number;
+  confidence: string;
+  hop_count?: number;
+  hop_distance?: number;
+  linked_amount?: number;
+  victim_linked_amount?: number;
+  attribution_source?: string;
+  evidence_path?: string[];
+  transaction_hashes?: string[];
+  provenance?: 'OBSERVED' | 'INFERRED' | 'ATTRIBUTED';
+  provenance_label?: 'OBSERVED' | 'INFERRED' | 'ATTRIBUTED';
+  reason_for_ranking?: string;
+  score_breakdown?: Record<string, any>;
+};
+
+export type VaspActionPackageInfo = {
+  case_reference: string;
+  source_wallet: string;
+  probable_vasp: string;
+  transaction_path?: string[];
+  transaction_hashes?: string[];
+  linked_value: number;
+  confidence: string;
+  evidence_ids?: string[];
+  provenance?: string;
+  limitations?: string[];
+  recommended_investigator_action?: string;
+};
+
+export type InvestigatorRecommendationItem = {
+  recommendation_id: string;
+  recommendation?: string;
+  title?: string;
+  action_item?: string;
+  priority: string;
+  reason?: string;
+  rationale?: string;
+  evidence_ids?: string[];
+  evidence_references?: string[];
+  case_id?: string;
+  created_at?: string;
+};
+
+export type InvestigationWorkflowState = {
+  case_id: string;
+  current_stage: string;
+  status: WorkflowStageStatus;
+  started_at: string;
+  completed_at?: string;
+  error?: string;
+  stages: WorkflowStageDetail[];
+  vasp_candidates?: VaspActionabilityCandidate[];
+  vasp_action_package?: VaspActionPackageInfo | null;
+  recommendations?: InvestigatorRecommendationItem[];
+};
+
+export type InvestigationRunResponse = {
+  case_id: string;
+  status: string;
+  message: string;
+  workflow: InvestigationWorkflowState;
+};
+

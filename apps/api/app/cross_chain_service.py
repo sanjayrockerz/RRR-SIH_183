@@ -120,3 +120,34 @@ class CrossChainService:
         links=await self.repository.cross_chain_links(case_id)
         chains=list(dict.fromkeys([x.source.chain for x in links]+[x.destination.chain for x in links if x.destination]))
         return CrossChainSummary(chains=chains,cross_chain_movements=len(links),bridge_interactions=len(links),unresolved_links=sum(1 for x in links if x.correlation_level=="UNRESOLVED"),strong_or_exact_links=sum(1 for x in links if x.correlation_level in {"STRONG","EXACT"}),status="ANALYZED" if links else "NOT_ANALYZED")
+
+    async def run_continuation(self, case_id: str, root_chain: Chain = Chain.ETHEREUM, root_address: str | None = None) -> CrossChainTrace:
+        req = CrossChainAnalyzeRequest(
+            chains=[Chain.ETHEREUM, Chain.TRON],
+            root_chain=root_chain,
+            root_address=root_address,
+            max_hops=4,
+            max_cross_chain_hops=2,
+        )
+        return await self.analyze(case_id, req)
+
+    async def timeline(self, case_id: str) -> list[dict]:
+        links = await self.repository.cross_chain_links(case_id)
+        events = []
+        for link in links:
+            events.append({
+                "link_id": link.link_id,
+                "source_chain": link.source.chain.value if hasattr(link.source, 'chain') and hasattr(link.source.chain, 'value') else str(link.source),
+                "source_address": link.source.address if hasattr(link.source, 'address') else "",
+                "source_tx": link.source_transaction_hash,
+                "bridge": link.bridge_id,
+                "destination_chain": link.destination.chain.value if link.destination and hasattr(link.destination, 'chain') and hasattr(link.destination.chain, 'value') else "UNKNOWN",
+                "destination_address": link.destination.address if link.destination and hasattr(link.destination, 'address') else "UNKNOWN",
+                "destination_tx": link.destination_transaction_hash,
+                "correlation_confidence": link.confidence_band.value if hasattr(link.confidence_band, 'value') else str(link.confidence_band),
+                "relationship_type": getattr(link, 'relationship_type', getattr(link, 'observed_or_inferred', 'INFERRED')),
+                "evidence_references": link.evidence_ids,
+                "created_at": link.created_at.isoformat() if hasattr(link.created_at, 'isoformat') else str(link.created_at),
+            })
+        return events
+

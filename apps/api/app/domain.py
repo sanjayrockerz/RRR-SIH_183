@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import StrEnum
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -120,6 +120,79 @@ class InterventionPriority(BaseModel):
     formula_version: str = "intervention-priority-v1"
     calculated_at: datetime
 
+class ExternalThreatIndicator(BaseModel):
+    provider: str
+    source: str
+    indicator: str
+    indicator_type: str
+    match_type: str
+    confidence: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    provenance: dict = Field(default_factory=dict)
+
+class BoundaryStatus(StrEnum):
+    SIMULATED = "SIMULATED"
+    NOT_CONNECTED = "NOT_CONNECTED"
+    CONNECTED = "CONNECTED"
+
+class NCRPIntakeRequest(BaseModel):
+    complaint_id: str
+    acknowledgement_number: str
+    incident_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    victim_name: str
+    victim_contact: str = ""
+    bank_or_wallet: str = ""
+    disputed_amount: float = 0.0
+    asset_symbol: str = "USDT"
+    blockchain: Chain = Chain.ETHEREUM
+    source_address: str
+    transaction_hash: str = ""
+    complaint_text: str = ""
+
+class NCRPValidationResponse(BaseModel):
+    valid: bool = True
+    status: BoundaryStatus = BoundaryStatus.SIMULATED
+    complaint_id: str
+    acknowledgement_number: str
+    validated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    validation_notes: list[str] = Field(default_factory=list)
+
+class RRRInvestigationOutput(BaseModel):
+    case_id: str
+    complaint_id: str
+    source_wallet: str
+    chain: Chain = Chain.ETHEREUM
+    risk_score: float = 0.0
+    risk_band: str = "GUARDED"
+    probable_vasp: str | None = None
+    vasp_confidence: str | None = None
+    traced_hops: int = 0
+    cross_chain_detected: bool = False
+    evidence_manifest_hash: str = ""
+    status: BoundaryStatus = BoundaryStatus.SIMULATED
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SAHYOGActionPackage(BaseModel):
+    package_id: str
+    case_id: str
+    complaint_id: str = ""
+    target_vasp: str
+    target_address: str
+    chain: Chain = Chain.ETHEREUM
+    freeze_request_amount: float = 0.0
+    evidence_ids: list[str] = Field(default_factory=list)
+    report_manifest_hash: str = ""
+    status: BoundaryStatus = BoundaryStatus.SIMULATED
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SAHYOGValidationResponse(BaseModel):
+    valid: bool = True
+    status: BoundaryStatus = BoundaryStatus.SIMULATED
+    package_id: str
+    target_vasp: str
+    validated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    validation_notes: list[str] = Field(default_factory=list)
+
 class DashboardIntelligence(BaseModel):
     status: str = "READY"
     critical_cases: int = 0
@@ -129,13 +202,15 @@ class DashboardIntelligence(BaseModel):
     cross_chain_cases: int = 0
     unresolved_cross_chain_cases: int = 0
     related_case_clusters: int = 0
+    case_fusion_clusters: list[dict] = Field(default_factory=list)
     open_alerts: int = 0
     critical_alerts: int = 0
-    priority_cases: list[PriorityCase] = []
-    recent_intelligence_events: list[dict] = []
-    risk_movements: list[dict] = []
-    risk_factor_summary: list[dict] = []
-    provider_state: dict = {}
+    priority_cases: list[PriorityCase] = Field(default_factory=list)
+    recent_intelligence_events: list[dict] = Field(default_factory=list)
+    risk_movements: list[dict] = Field(default_factory=list)
+    risk_factor_summary: list[dict] = Field(default_factory=list)
+    investigator_recommendations: list[dict] = Field(default_factory=list)
+    provider_state: dict = Field(default_factory=dict)
     generated_at: datetime
 
 class CaseIntelligenceSnapshot(BaseModel):
@@ -1301,3 +1376,105 @@ class CrossChainPatternObservation(BaseModel):
     metadata: dict = {}
     fingerprint: str
     observed_at: datetime
+
+
+# ── Investigation Orchestration & VASP Actionability Domain Models ──
+
+class PipelineStage(StrEnum):
+    INTAKE = "INTAKE"
+    TRACE = "TRACE"
+    GRAPH = "GRAPH"
+    PATTERN_ANALYSIS = "PATTERN_ANALYSIS"
+    RISK_ASSESSMENT = "RISK_ASSESSMENT"
+    VASP_ATTRIBUTION = "VASP_ATTRIBUTION"
+    RECOMMENDATION = "RECOMMENDATION"
+    EVIDENCE_PACKAGE = "EVIDENCE_PACKAGE"
+    REPORT = "REPORT"
+
+class WorkflowStageStatus(StrEnum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    SKIPPED = "SKIPPED"
+
+class ProvenanceType(StrEnum):
+    OBSERVED = "OBSERVED"
+    INFERRED = "INFERRED"
+    ATTRIBUTED = "ATTRIBUTED"
+
+class WorkflowStageDetail(BaseModel):
+    stage: PipelineStage
+    status: WorkflowStageStatus = WorkflowStageStatus.PENDING
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error: str | None = None
+    evidence_references: list[str] = Field(default_factory=list)
+    output_summary: dict = Field(default_factory=dict)
+
+class VaspActionabilityCandidate(BaseModel):
+    vasp_name: str
+    entity_id: str | None = None
+    deposit_address: str | None = None
+    score: float = Field(ge=0, le=100)
+    confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM
+    hop_count: int = 0
+    linked_amount: float = 0.0
+    attribution_source: str = "SYNTHETIC_INTELLIGENCE"
+    evidence_path: list[str] = Field(default_factory=list)
+    transaction_hashes: list[str] = Field(default_factory=list)
+    provenance: ProvenanceType = ProvenanceType.ATTRIBUTED
+    reason_for_ranking: str = ""
+
+class VaspActionPackage(BaseModel):
+    case_reference: str
+    source_wallet: str
+    probable_vasp: str
+    transaction_path: list[str] = Field(default_factory=list)
+    transaction_hashes: list[str] = Field(default_factory=list)
+    linked_value: float = 0.0
+    confidence: ConfidenceLevel = ConfidenceLevel.HIGH
+    evidence_ids: list[str] = Field(default_factory=list)
+    provenance: ProvenanceType = ProvenanceType.ATTRIBUTED
+    limitations: list[str] = Field(default_factory=list)
+    recommended_investigator_action: str = ""
+
+class InvestigatorRecommendation(BaseModel):
+    recommendation_id: str
+    priority: str = "HIGH"  # CRITICAL, HIGH, MEDIUM, LOW
+    title: str = ""
+    reason: str = ""
+    evidence_ids: list[str] = Field(default_factory=list)
+    case_id: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    recommendation: str = ""
+    evidence_references: list[str] = Field(default_factory=list)
+
+    def model_post_init(self, __context):
+        if not self.title and self.recommendation:
+            self.title = self.recommendation
+        if not self.recommendation and self.title:
+            self.recommendation = self.title
+        if not self.evidence_ids and self.evidence_references:
+            self.evidence_ids = self.evidence_references
+        if not self.evidence_references and self.evidence_ids:
+            self.evidence_references = self.evidence_ids
+
+class InvestigationWorkflowState(BaseModel):
+    case_id: str
+    current_stage: PipelineStage = PipelineStage.INTAKE
+    status: WorkflowStageStatus = WorkflowStageStatus.PENDING
+    started_at: datetime
+    completed_at: datetime | None = None
+    error: str | None = None
+    stages: list[WorkflowStageDetail] = Field(default_factory=list)
+    vasp_candidates: list[VaspActionabilityCandidate] = Field(default_factory=list)
+    vasp_action_package: VaspActionPackage | None = None
+    recommendations: list[InvestigatorRecommendation] = Field(default_factory=list)
+
+class InvestigationRunResponse(BaseModel):
+    case_id: str
+    status: str
+    message: str
+    workflow: InvestigationWorkflowState
+

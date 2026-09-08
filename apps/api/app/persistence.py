@@ -919,3 +919,42 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             if item.severity=="HIGH": summary.high_count+=1
             if item.severity=="MEDIUM": summary.medium_count+=1
         return summary
+
+    async def save_workflow_state(self, case_id: str, state: InvestigationWorkflowState) -> InvestigationWorkflowState:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        self._in_mem_workflows[case_id] = state
+        return state
+
+    async def get_workflow_state(self, case_id: str) -> InvestigationWorkflowState | None:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        return self._in_mem_workflows.get(case_id)
+
+    async def update_workflow_stage(self, case_id: str, stage: str, stage_detail: WorkflowStageDetail) -> InvestigationWorkflowState:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        state = self._in_mem_workflows.get(case_id)
+        if not state:
+            state = InvestigationWorkflowState(case_id=case_id, started_at=datetime.now(timezone.utc), stages=[])
+        updated_stages = []
+        replaced = False
+        for s in state.stages:
+            if s.stage == stage_detail.stage:
+                updated_stages.append(stage_detail)
+                replaced = True
+            else:
+                updated_stages.append(s)
+        if not replaced:
+            updated_stages.append(stage_detail)
+        state.stages = updated_stages
+        state.current_stage = stage_detail.stage
+        self._in_mem_workflows[case_id] = state
+        return state
+
+    async def reset_realtime_event(self, event_id: str) -> RealtimeEvent:
+        event = await self.get_realtime_event(event_id)
+        if not event: raise DatabaseError(f"Realtime event {event_id} not found")
+        return event.model_copy(update={"processing_status": RealtimeProcessingStatus.RECEIVED, "error": None})
+
+    async def risk_registry_search(self, query: str = "", wallet: str | None = None) -> list:
+        return []
+
+
