@@ -3,18 +3,18 @@ Phase 10E Runtime Smoke Tests
 Validates the full browser → FastAPI → PostgreSQL/Neo4j open-case flow.
 Run with: pytest tests/test_runtime_open_case.py -v
 
-Requires the stack to be running: docker compose up -d
+The standard suite exercises the same FastAPI application in-process. A
+separately deployed-process check belongs in the external_runtime group.
 """
-import os
 import pytest
-import httpx
-
-BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
+from fastapi.testclient import TestClient
+from app.main import app
 
 
 @pytest.fixture(scope="module")
 def client():
-    return httpx.Client(base_url=BASE, timeout=30)
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 # -- 1. Health ----------------------------------------------------------------

@@ -1,0 +1,19 @@
+{
+  "v1": {
+    "accuracy": 0.9547762384855298,
+    "macro_f1": 0.6299923856600759,
+    "illicit_f1": 0.2833333333333333,
+    "illicit_recall": 0.1932575460603685,
+    "pr_auc": 0.2527098524288094,
+    "roc_auc": 0.7116493699826093
+  },
+  "v1_1": {
+    "accuracy": 0.6967614419380576,
+    "macro_f1": 0.48059758704903566,
+    "pr_auc": 0.24638550314058447,
+    "roc_auc": 0.7191241148766766,
+    "illicit_f1": 0.145521434775944,
+    "illicit_recall": 0.5582124656997256
+  },
+  "selection_note": "V1.1 prioritizes illicit recall/F1/PR-AUC; final threshold is validation-selected."
+}

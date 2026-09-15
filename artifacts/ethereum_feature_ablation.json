@@ -1,0 +1,94 @@
+{
+  "A_transaction_only": {
+    "feature_count": 13,
+    "validation": {
+      "accuracy": 0.9245923913043478,
+      "precision": 0.8211382113821138,
+      "recall": 0.8706896551724138,
+      "illicit_f1": 0.8451882845188284,
+      "macro_f1": 0.8976727233101551,
+      "roc_auc": 0.9709933734200515,
+      "pr_auc": 0.9280978622913496,
+      "confusion_matrix": [
+        [
+          1058,
+          66
+        ],
+        [
+          45,
+          303
+        ]
+      ]
+    },
+    "selected_threshold": 0.51
+  },
+  "B_transaction_temporal": {
+    "feature_count": 17,
+    "validation": {
+      "accuracy": 0.9510869565217391,
+      "precision": 0.9259259259259259,
+      "recall": 0.8620689655172413,
+      "illicit_f1": 0.8928571428571429,
+      "macro_f1": 0.9305835010060363,
+      "roc_auc": 0.9878397656154129,
+      "pr_auc": 0.9662404859282158,
+      "confusion_matrix": [
+        [
+          1100,
+          24
+        ],
+        [
+          48,
+          300
+        ]
+      ]
+    },
+    "selected_threshold": 0.76
+  },
+  "C_transaction_temporal_contract_erc20": {
+    "feature_count": 23,
+    "validation": {
+      "accuracy": 0.983016304347826,
+      "precision": 0.9627507163323782,
+      "recall": 0.9655172413793104,
+      "illicit_f1": 0.9641319942611191,
+      "macro_f1": 0.9765030242778671,
+      "roc_auc": 0.9980237861496298,
+      "pr_auc": 0.9943018373194227,
+      "confusion_matrix": [
+        [
+          1111,
+          13
+        ],
+        [
+          12,
+          336
+        ]
+      ]
+    },
+    "selected_threshold": 0.63
+  },
+  "D_full_runtime_compatible": {
+    "feature_count": 41,
+    "validation": {
+      "accuracy": 0.9850543478260869,
+      "precision": 0.9738372093023255,
+      "recall": 0.9626436781609196,
+      "illicit_f1": 0.9682080924855492,
+      "macro_f1": 0.9792194991735028,
+      "roc_auc": 0.9980110033950996,
+      "pr_auc": 0.9941612300223017,
+      "confusion_matrix": [
+        [
+          1115,
+          9
+        ],
+        [
+          13,
+          335
+        ]
+      ]
+    },
+    "selected_threshold": 0.74
+  }
+}

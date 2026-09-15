@@ -1,0 +1,6 @@
+{
+  "status": "SECOND_ETHEREUM_DATASET_MISSING",
+  "independent_candidates": [],
+  "merged_model_trained": false,
+  "reason": "Derived Parquet excluded as dependent output."
+}

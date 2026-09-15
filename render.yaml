@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: crypto-fraud-intelligence-api
+    env: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_AUTO_MIGRATE
+        value: "true"
+      - key: BLOCKCHAIN_DATA_MODE
+        value: LIVE
+      - key: RRR_ML_MODEL_PATH
+        value: models/rrr_ethereum_wallet_xgb_v2.joblib
+      - key: RRR_ML_METADATA_PATH
+        value: models/rrr_ethereum_wallet_xgb_v2_metadata.json

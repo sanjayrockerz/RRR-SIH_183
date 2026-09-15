@@ -1,0 +1,120 @@
+{
+  "model_name": "RRR Ethereum Wallet Behaviour Model V2",
+  "model_version": "rrr_ethereum_wallet_xgb_v2",
+  "feature_schema_version": "RRRFeatureSchemaV2",
+  "feature_order": [
+    "incoming_tx_count",
+    "outgoing_tx_count",
+    "total_tx_count",
+    "unique_senders",
+    "unique_receivers",
+    "total_value_in",
+    "total_value_out",
+    "mean_value_in",
+    "mean_value_out",
+    "min_value_in",
+    "max_value_in",
+    "min_value_out",
+    "max_value_out",
+    "activity_duration",
+    "sent_interarrival_mean",
+    "received_interarrival_mean",
+    "created_contract_count",
+    "token_transfer_count",
+    "unique_contract_count",
+    "erc20_missing_indicator",
+    "unique_counterparties",
+    "in_out_tx_ratio",
+    "out_in_value_ratio",
+    "net_flow_ratio",
+    "counterparty_reuse_count",
+    "counterparty_reuse_ratio",
+    "transactions_per_active_period",
+    "contract_interaction_count",
+    "contract_interaction_ratio",
+    "log1p_incoming_tx_count",
+    "log1p_outgoing_tx_count",
+    "log1p_total_tx_count",
+    "log1p_unique_senders",
+    "log1p_unique_receivers",
+    "log1p_unique_counterparties",
+    "log1p_total_value_in",
+    "log1p_total_value_out",
+    "log1p_activity_duration",
+    "log1p_token_transfer_count",
+    "log1p_unique_contract_count",
+    "log1p_created_contract_count"
+  ],
+  "training_dataset_names": [
+    "Ethereum Fraud Detection Dataset"
+  ],
+  "dataset_hashes": {
+    "transaction_dataset.csv": "874e125be2ac6220a92c7dbacf6c6f1766c60e3966473406d6700090831f7d9a"
+  },
+  "label_contract": {
+    "source_dataset": "Ethereum Fraud Detection Dataset",
+    "local_file": "data/Datasets/transaction_dataset.csv",
+    "mapping": {
+      "0": "LICIT_LIKE",
+      "1": "HIGH_RISK_LIKE"
+    },
+    "original_field": "FLAG",
+    "normalized_field": "normalized_label",
+    "raw_counts": {
+      "FLAG=0": 7662,
+      "FLAG=1": 2179
+    },
+    "label_scope": "Behavioural fraud-indicator target normalized for RRR; not a claim of criminality.",
+    "verified_by_user": true
+  },
+  "hyperparameters": {
+    "max_depth": 4,
+    "min_child_weight": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.75,
+    "colsample_bytree": 1.0,
+    "gamma": 0,
+    "n_estimators": 1000,
+    "early_stopping_rounds": 50,
+    "scale_pos_weight": 3.5055737704918033
+  },
+  "class_weighting": {
+    "method": "scale_pos_weight",
+    "natural_ratio": 3.5055737704918033,
+    "selected": 3.5055737704918033
+  },
+  "threshold": 0.63,
+  "calibration_method": null,
+  "train_validation_test_counts": {
+    "train": 6871,
+    "validation": 1472,
+    "test": 1473
+  },
+  "test_metrics": {
+    "accuracy": 0.9769178547182621,
+    "precision": 0.9473684210526315,
+    "recall": 0.9411764705882353,
+    "illicit_f1": 0.9442622950819672,
+    "macro_f1": 0.9648537502807096,
+    "roc_auc": 0.9956202989622013,
+    "pr_auc": 0.9860139227438004,
+    "confusion_matrix": [
+      [
+        1151,
+        16
+      ],
+      [
+        18,
+        288
+      ]
+    ],
+    "high_risk_wallets_detected": 288,
+    "high_risk_wallets_missed": 18,
+    "licit_wallets_falsely_flagged": 16
+  },
+  "training_timestamp": "2026-09-09T05:46:47.459776+00:00",
+  "git_commit": "3d77d08254cb2e6f441436bc8d334c60a76cd7d1",
+  "limitations": [
+    "Wallet-level aggregate source; no raw transaction hash/from/to/timestamp/block columns; graph fields excluded; HIGH_RISK_LIKE is behavioural and not criminality; not an exchange-role model."
+  ]
+}

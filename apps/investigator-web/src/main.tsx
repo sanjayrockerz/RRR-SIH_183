@@ -24,5 +24,8 @@ import './ledger.css';
 import './case-command.css';
 import './operations.css';
 import './shell-premium.css';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import './sahyog-demo.css';
+import './integration-sahyog-standalone.css';
 
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
+createRoot(document.getElementById('root')!).render(<React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>);

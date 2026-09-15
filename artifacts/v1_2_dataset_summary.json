@@ -1,0 +1,23 @@
+{
+  "TEMPORAL": {
+    "rows": 291419,
+    "licit": 276699,
+    "illicit": 14720,
+    "latest_timestep_min": 1,
+    "latest_timestep_max": 49
+  },
+  "LATEST_OBSERVATION": {
+    "rows": 265354,
+    "licit": 251088,
+    "illicit": 14266,
+    "latest_timestep_min": 1,
+    "latest_timestep_max": 49
+  },
+  "AGGREGATED_HISTORY": {
+    "rows": 265354,
+    "licit": 251088,
+    "illicit": 14266,
+    "latest_timestep_min": 1,
+    "latest_timestep_max": 49
+  }
+}

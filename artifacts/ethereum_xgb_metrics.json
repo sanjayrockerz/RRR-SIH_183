@@ -1,0 +1,217 @@
+{
+  "model_name": "RRR Ethereum Wallet Behaviour Model V2",
+  "feature_schema_version": "RRRFeatureSchemaV2",
+  "feature_order": [
+    "incoming_tx_count",
+    "outgoing_tx_count",
+    "total_tx_count",
+    "unique_senders",
+    "unique_receivers",
+    "total_value_in",
+    "total_value_out",
+    "mean_value_in",
+    "mean_value_out",
+    "min_value_in",
+    "max_value_in",
+    "min_value_out",
+    "max_value_out",
+    "activity_duration",
+    "sent_interarrival_mean",
+    "received_interarrival_mean",
+    "created_contract_count",
+    "token_transfer_count",
+    "unique_contract_count",
+    "erc20_missing_indicator",
+    "unique_counterparties",
+    "in_out_tx_ratio",
+    "out_in_value_ratio",
+    "net_flow_ratio",
+    "counterparty_reuse_count",
+    "counterparty_reuse_ratio",
+    "transactions_per_active_period",
+    "contract_interaction_count",
+    "contract_interaction_ratio",
+    "log1p_incoming_tx_count",
+    "log1p_outgoing_tx_count",
+    "log1p_total_tx_count",
+    "log1p_unique_senders",
+    "log1p_unique_receivers",
+    "log1p_unique_counterparties",
+    "log1p_total_value_in",
+    "log1p_total_value_out",
+    "log1p_activity_duration",
+    "log1p_token_transfer_count",
+    "log1p_unique_contract_count",
+    "log1p_created_contract_count"
+  ],
+  "training_dataset": "data/Datasets/transaction_dataset.csv",
+  "raw_dataset_sha256": "874e125be2ac6220a92c7dbacf6c6f1766c60e3966473406d6700090831f7d9a",
+  "processed_table_sha256": "a5510b1113348f3352df3f5bd4a1709f21f587a812d30383460ecccdc66de37d",
+  "natural_imbalance_ratio": 3.5055737704918033,
+  "best_hyperparameters": {
+    "max_depth": 4,
+    "min_child_weight": 5,
+    "learning_rate": 0.05,
+    "subsample": 0.75,
+    "colsample_bytree": 1.0,
+    "gamma": 0,
+    "n_estimators": 1000,
+    "early_stopping_rounds": 50,
+    "scale_pos_weight": 3.5055737704918033
+  },
+  "validation": {
+    "accuracy": 0.984375,
+    "precision": 0.9710144927536232,
+    "recall": 0.9626436781609196,
+    "illicit_f1": 0.9668109668109668,
+    "macro_f1": 0.9782966428901569,
+    "roc_auc": 0.9978320448316766,
+    "pr_auc": 0.9937282076270874,
+    "confusion_matrix": [
+      [
+        1114,
+        10
+      ],
+      [
+        13,
+        335
+      ]
+    ]
+  },
+  "test": {
+    "accuracy": 0.9769178547182621,
+    "precision": 0.9473684210526315,
+    "recall": 0.9411764705882353,
+    "illicit_f1": 0.9442622950819672,
+    "macro_f1": 0.9648537502807096,
+    "roc_auc": 0.9956202989622013,
+    "pr_auc": 0.9860139227438004,
+    "confusion_matrix": [
+      [
+        1151,
+        16
+      ],
+      [
+        18,
+        288
+      ]
+    ],
+    "high_risk_wallets_detected": 288,
+    "high_risk_wallets_missed": 18,
+    "licit_wallets_falsely_flagged": 16
+  },
+  "operating_points": {
+    "HIGH_RECALL": {
+      "threshold": 0.19,
+      "precision": 0.8940568475452196,
+      "recall": 0.9942528735632183,
+      "illicit_f1": 0.9414965986394558,
+      "false_positives": 41.0,
+      "false_negatives": 2.0
+    },
+    "BALANCED_MAX_F1": {
+      "threshold": 0.63,
+      "precision": 0.9710144927536232,
+      "recall": 0.9626436781609196,
+      "illicit_f1": 0.9668109668109668,
+      "false_positives": 10.0,
+      "false_negatives": 13.0
+    },
+    "HIGH_PRECISION": {
+      "threshold": 0.93,
+      "precision": 0.9936708860759493,
+      "recall": 0.9022988505747126,
+      "illicit_f1": 0.9457831325301205,
+      "false_positives": 2.0,
+      "false_negatives": 34.0
+    }
+  },
+  "random_forest": {
+    "validation": {
+      "accuracy": 0.9769021739130435,
+      "precision": 0.9410112359550562,
+      "recall": 0.9626436781609196,
+      "illicit_f1": 0.9517045454545454,
+      "macro_f1": 0.9682629870129871,
+      "roc_auc": 0.9974945801120793,
+      "pr_auc": 0.9920817570059808,
+      "confusion_matrix": [
+        [
+          1103,
+          21
+        ],
+        [
+          13,
+          335
+        ]
+      ]
+    },
+    "test": {
+      "accuracy": 0.9735234215885947,
+      "precision": 0.9265175718849841,
+      "recall": 0.9477124183006536,
+      "illicit_f1": 0.9369951534733441,
+      "macro_f1": 0.9601176884685156,
+      "roc_auc": 0.9944469647327654,
+      "pr_auc": 0.9817092046297027,
+      "confusion_matrix": [
+        [
+          1144,
+          23
+        ],
+        [
+          16,
+          290
+        ]
+      ]
+    }
+  },
+  "top_features": {
+    "erc20_missing_indicator": 0.24527552723884583,
+    "total_value_in": 0.14627808332443237,
+    "counterparty_reuse_ratio": 0.1429671347141266,
+    "token_transfer_count": 0.11769626289606094,
+    "activity_duration": 0.05417792499065399,
+    "unique_senders": 0.04102310910820961,
+    "mean_value_in": 0.03238142654299736,
+    "in_out_tx_ratio": 0.027814630419015884,
+    "min_value_in": 0.022512784227728844,
+    "received_interarrival_mean": 0.02234102226793766,
+    "counterparty_reuse_count": 0.013500411994755268,
+    "total_tx_count": 0.01240417268127203,
+    "outgoing_tx_count": 0.0110626807436347,
+    "min_value_out": 0.010317407548427582,
+    "unique_counterparties": 0.010058143176138401,
+    "net_flow_ratio": 0.009968905709683895,
+    "unique_contract_count": 0.009013449773192406,
+    "sent_interarrival_mean": 0.007961585186421871,
+    "contract_interaction_ratio": 0.007653724402189255,
+    "max_value_in": 0.006736412178725004,
+    "transactions_per_active_period": 0.0065662977285683155,
+    "incoming_tx_count": 0.006517463829368353,
+    "unique_receivers": 0.006347264628857374,
+    "log1p_total_value_out": 0.005816497839987278,
+    "out_in_value_ratio": 0.005811956245452166,
+    "total_value_out": 0.004993802402168512,
+    "mean_value_out": 0.004939854145050049,
+    "max_value_out": 0.0045604645274579525,
+    "created_contract_count": 0.003301576478406787,
+    "contract_interaction_count": 0.0,
+    "log1p_incoming_tx_count": 0.0,
+    "log1p_outgoing_tx_count": 0.0,
+    "log1p_total_tx_count": 0.0,
+    "log1p_unique_senders": 0.0,
+    "log1p_unique_receivers": 0.0,
+    "log1p_unique_counterparties": 0.0,
+    "log1p_total_value_in": 0.0,
+    "log1p_activity_duration": 0.0,
+    "log1p_token_transfer_count": 0.0,
+    "log1p_unique_contract_count": 0.0,
+    "log1p_created_contract_count": 0.0
+  },
+  "trained_at": "2026-09-09T05:46:47.459776+00:00",
+  "acceptance": {
+    "preferred": true,
+    "minimum": true
+  }
+}

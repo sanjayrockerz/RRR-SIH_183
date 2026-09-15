@@ -1,0 +1,123 @@
+{
+  "schema_version": "RRRFeatureSchemaV1.2",
+  "feature_order": [
+    "incoming_tx_count",
+    "outgoing_tx_count",
+    "unique_senders",
+    "unique_receivers",
+    "total_in",
+    "total_out",
+    "mean_in",
+    "mean_out",
+    "out_in_ratio",
+    "activity_duration",
+    "burstiness",
+    "in_degree",
+    "out_degree",
+    "total_degree",
+    "fan_in_score",
+    "fan_out_score",
+    "repeated_counterparty_ratio",
+    "min_in",
+    "max_in",
+    "median_in",
+    "min_out",
+    "max_out",
+    "median_out",
+    "total_tx_count",
+    "sender_ratio",
+    "receiver_ratio",
+    "repeated_address_count",
+    "observation_lifetime",
+    "active_period_count",
+    "mean_activity_gap",
+    "median_activity_gap",
+    "min_activity_gap",
+    "max_activity_gap",
+    "max_to_mean_out_ratio",
+    "max_to_mean_in_ratio",
+    "sent_received_ratio",
+    "net_flow_ratio",
+    "unique_counterparties",
+    "counterparty_reuse_count",
+    "in_out_degree_ratio",
+    "degree_imbalance",
+    "graph_activity_density",
+    "log1p_incoming_tx_count",
+    "log1p_outgoing_tx_count",
+    "log1p_total_in",
+    "log1p_total_out",
+    "log1p_total_tx_count",
+    "log1p_in_degree",
+    "log1p_out_degree",
+    "log1p_total_degree",
+    "log1p_activity_duration",
+    "log1p_observation_lifetime",
+    "log1p_repeated_address_count",
+    "log1p_unique_counterparties",
+    "log1p_counterparty_reuse_count"
+  ],
+  "aggregation_rules": {
+    "sum": [
+      "incoming_tx_count",
+      "outgoing_tx_count",
+      "repeated_address_count",
+      "total_in",
+      "total_out",
+      "total_tx_count"
+    ],
+    "max": [
+      "active_period_count",
+      "activity_duration",
+      "observation_lifetime"
+    ],
+    "median": [
+      "burstiness",
+      "max_activity_gap",
+      "max_in",
+      "max_out",
+      "mean_activity_gap",
+      "mean_in",
+      "mean_out",
+      "median_activity_gap",
+      "median_in",
+      "median_out",
+      "min_activity_gap",
+      "min_in",
+      "min_out"
+    ],
+    "graph_fixed_once": [
+      "counterparty_reuse_count",
+      "degree_imbalance",
+      "fan_in_score",
+      "fan_out_score",
+      "graph_activity_density",
+      "in_degree",
+      "in_out_degree_ratio",
+      "out_degree",
+      "repeated_counterparty_ratio",
+      "total_degree",
+      "unique_counterparties"
+    ],
+    "derived": "Ratios are recomputed after aggregation from aggregated primitive fields; no label fields participate."
+  },
+  "source": "rrr_wallet_features_v1_1.parquet derived from Elliptic++ Actors and AddrAddr_edgelist.csv",
+  "label_rule": "1=ILLICIT, 0=LICIT; UNKNOWN was excluded before construction.",
+  "variants": {
+    "TEMPORAL": {
+      "rows": 291419,
+      "illicit": 14720,
+      "licit": 276699
+    },
+    "LATEST_OBSERVATION": {
+      "rows": 265354,
+      "illicit": 14266,
+      "licit": 251088
+    },
+    "AGGREGATED_HISTORY": {
+      "rows": 265354,
+      "illicit": 14266,
+      "licit": 251088
+    }
+  }
+}

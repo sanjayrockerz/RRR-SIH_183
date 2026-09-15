@@ -1,0 +1,15 @@
+{
+  "schema_version": "RRRFeatureSchemaV1",
+  "target": "label",
+  "label_mapping": {"1": "ILLICIT", "0": "LICIT"},
+  "excluded_raw_class": {"3": "UNKNOWN"},
+  "feature_order": ["incoming_tx_count", "outgoing_tx_count", "unique_senders", "unique_receivers", "total_in", "total_out", "mean_in", "mean_out", "out_in_ratio", "activity_duration", "burstiness", "in_degree", "out_degree", "total_degree", "fan_in_score", "fan_out_score", "repeated_counterparty_ratio"],
+  "provenance": {"training_sources": ["wallets_features.csv", "wallets_classes.csv", "AddrAddr_edgelist.csv"], "runtime_sources": ["RRR persisted TraceResult/GraphEdge", "Alchemy historical observations", "TronGrid historical observations"], "excluded_from_model": ["RiskEngine score/band", "neighbor labels", "Chainabuse outcomes", "future observations"]},
+  "definitions": {
+    "burstiness": "total_txs / (1 + lifetime_in_blocks) for training; runtime equivalent uses observed transaction count and activity duration",
+    "fan_in_score": "in_degree / total_degree",
+    "fan_out_score": "out_degree / total_degree",
+    "repeated_counterparty_ratio": "1 - (unique incoming counterparties + unique outgoing counterparties) / total degree, clipped to [0,1]",
+    "graph_features": "computed from AddrAddr_edgelist topology only; no class labels used"
+  }
+}

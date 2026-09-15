@@ -1,0 +1,26 @@
+{
+  "strategy": "stratified address-grouped 70/15/15; test untouched until final evaluation",
+  "splits": {
+    "train": {
+      "rows": 6871,
+      "class_distribution": {
+        "LICIT_LIKE": 5346,
+        "HIGH_RISK_LIKE": 1525
+      }
+    },
+    "validation": {
+      "rows": 1472,
+      "class_distribution": {
+        "LICIT_LIKE": 1124,
+        "HIGH_RISK_LIKE": 348
+      }
+    },
+    "test": {
+      "rows": 1473,
+      "class_distribution": {
+        "LICIT_LIKE": 1167,
+        "HIGH_RISK_LIKE": 306
+      }
+    }
+  }
+}

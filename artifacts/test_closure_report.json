@@ -1,0 +1,20 @@
+{
+  "backend_passed": 144,
+  "backend_failed": 0,
+  "backend_errors": 0,
+  "backend_skipped": 3,
+  "frontend_tests": {"passed": 1, "failed": 0},
+  "frontend_build": "passed",
+  "ml_tests": {"passed": 8, "failed": 0},
+  "hybrid_tests": {"passed": 3, "failed": 0},
+  "recommendation_tests": {"passed": 3, "failed": 0},
+  "report_tests": {"passed": 2, "failed": 0},
+  "alert_tests": {"passed": 1, "failed": 0},
+  "realtime_demo_tests": {"passed": 2, "failed": 0},
+  "external_only_tests": [
+    "apps/api/tests/test_operational_acceptance.py (requires RUN_OPERATIONAL_ACCEPTANCE=1 and a running Docker/PostgreSQL stack)"
+  ],
+  "model_sha256": "5d36a620e91c39e521a953714196bdd09fec28d73560d8c98755514579257da5",
+  "metadata_sha256": "0e6db36935b6e21688b1eab24297c3fc2981bb950db00886e5d52f085c29725c",
+  "status": "GREEN"
+}

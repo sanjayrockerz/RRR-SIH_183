@@ -1,0 +1,377 @@
+{
+  "generated_at": "2026-09-08T06:10:17.564299+00:00",
+  "dataset_root": "C:\\Users\\motis\\Downloads\\CRYPTO FRAUD INTELLIGENCE\\data\\Datasets",
+  "files": [
+    {
+      "path": "data\\Datasets\\AddrAddr_edgelist.csv",
+      "format": "csv",
+      "rows": 2868964,
+      "columns": [
+        "input_address",
+        "output_address"
+      ],
+      "dtypes_inferred": {
+        "input_address": "object",
+        "output_address": "object"
+      },
+      "missing_values": {},
+      "malformed_rows": 0
+    },
+    {
+      "path": "data\\Datasets\\wallets_classes.csv",
+      "format": "csv",
+      "rows": 822942,
+      "columns": [
+        "address",
+        "class"
+      ],
+      "dtypes_inferred": {
+        "address": "object",
+        "class": "float64"
+      },
+      "missing_values": {},
+      "malformed_rows": 0
+    },
+    {
+      "path": "data\\Datasets\\wallets_features.csv",
+      "format": "csv",
+      "rows": 1268260,
+      "columns": [
+        "address",
+        "Time step",
+        "num_txs_as_sender",
+        "num_txs_as receiver",
+        "first_block_appeared_in",
+        "last_block_appeared_in",
+        "lifetime_in_blocks",
+        "total_txs",
+        "first_sent_block",
+        "first_received_block",
+        "num_timesteps_appeared_in",
+        "btc_transacted_total",
+        "btc_transacted_min",
+        "btc_transacted_max",
+        "btc_transacted_mean",
+        "btc_transacted_median",
+        "btc_sent_total",
+        "btc_sent_min",
+        "btc_sent_max",
+        "btc_sent_mean",
+        "btc_sent_median",
+        "btc_received_total",
+        "btc_received_min",
+        "btc_received_max",
+        "btc_received_mean",
+        "btc_received_median",
+        "fees_total",
+        "fees_min",
+        "fees_max",
+        "fees_mean",
+        "fees_median",
+        "fees_as_share_total",
+        "fees_as_share_min",
+        "fees_as_share_max",
+        "fees_as_share_mean",
+        "fees_as_share_median",
+        "blocks_btwn_txs_total",
+        "blocks_btwn_txs_min",
+        "blocks_btwn_txs_max",
+        "blocks_btwn_txs_mean",
+        "blocks_btwn_txs_median",
+        "blocks_btwn_input_txs_total",
+        "blocks_btwn_input_txs_min",
+        "blocks_btwn_input_txs_max",
+        "blocks_btwn_input_txs_mean",
+        "blocks_btwn_input_txs_median",
+        "blocks_btwn_output_txs_total",
+        "blocks_btwn_output_txs_min",
+        "blocks_btwn_output_txs_max",
+        "blocks_btwn_output_txs_mean",
+        "blocks_btwn_output_txs_median",
+        "num_addr_transacted_multiple",
+        "transacted_w_address_total",
+        "transacted_w_address_min",
+        "transacted_w_address_max",
+        "transacted_w_address_mean",
+        "transacted_w_address_median"
+      ],
+      "dtypes_inferred": {
+        "address": "object",
+        "Time step": "float64",
+        "num_txs_as_sender": "float64",
+        "num_txs_as receiver": "float64",
+        "first_block_appeared_in": "float64",
+        "last_block_appeared_in": "float64",
+        "lifetime_in_blocks": "float64",
+        "total_txs": "float64",
+        "first_sent_block": "float64",
+        "first_received_block": "float64",
+        "num_timesteps_appeared_in": "float64",
+        "btc_transacted_total": "float64",
+        "btc_transacted_min": "float64",
+        "btc_transacted_max": "float64",
+        "btc_transacted_mean": "float64",
+        "btc_transacted_median": "float64",
+        "btc_sent_total": "float64",
+        "btc_sent_min": "float64",
+        "btc_sent_max": "float64",
+        "btc_sent_mean": "float64",
+        "btc_sent_median": "float64",
+        "btc_received_total": "float64",
+        "btc_received_min": "float64",
+        "btc_received_max": "float64",
+        "btc_received_mean": "float64",
+        "btc_received_median": "float64",
+        "fees_total": "float64",
+        "fees_min": "float64",
+        "fees_max": "float64",
+        "fees_mean": "float64",
+        "fees_median": "float64",
+        "fees_as_share_total": "float64",
+        "fees_as_share_min": "float64",
+        "fees_as_share_max": "float64",
+        "fees_as_share_mean": "float64",
+        "fees_as_share_median": "float64",
+        "blocks_btwn_txs_total": "float64",
+        "blocks_btwn_txs_min": "float64",
+        "blocks_btwn_txs_max": "float64",
+        "blocks_btwn_txs_mean": "float64",
+        "blocks_btwn_txs_median": "float64",
+        "blocks_btwn_input_txs_total": "float64",
+        "blocks_btwn_input_txs_min": "float64",
+        "blocks_btwn_input_txs_max": "float64",
+        "blocks_btwn_input_txs_mean": "float64",
+        "blocks_btwn_input_txs_median": "float64",
+        "blocks_btwn_output_txs_total": "float64",
+        "blocks_btwn_output_txs_min": "float64",
+        "blocks_btwn_output_txs_max": "float64",
+        "blocks_btwn_output_txs_mean": "float64",
+        "blocks_btwn_output_txs_median": "float64",
+        "num_addr_transacted_multiple": "float64",
+        "transacted_w_address_total": "float64",
+        "transacted_w_address_min": "float64",
+        "transacted_w_address_max": "float64",
+        "transacted_w_address_mean": "float64",
+        "transacted_w_address_median": "float64"
+      },
+      "missing_values": {},
+      "malformed_rows": 0
+    }
+  ],
+  "semantic_audit": {
+    "classes": {
+      "rows": 822942,
+      "duplicate_wallet_ids": 0,
+      "label_distribution_raw": {
+        "2": 251088,
+        "3": 557588,
+        "1": 14266
+      },
+      "known_supervised_mapping": {
+        "1": "ILLICIT",
+        "2": "LICIT"
+      },
+      "unknown_or_other_classes": [
+        "3"
+      ]
+    },
+    "features": {
+      "rows": 1268260,
+      "unique_wallet_ids": 822942,
+      "duplicate_address_timestep_rows": 347569,
+      "time_step_distribution": {
+        "25": 22788,
+        "29": 21970,
+        "39": 14842,
+        "43": 32411,
+        "47": 28088,
+        "48": 22854,
+        "21": 39557,
+        "17": 21426,
+        "20": 39748,
+        "5": 35140,
+        "23": 22136,
+        "33": 18345,
+        "36": 47243,
+        "4": 39948,
+        "32": 22282,
+        "14": 8009,
+        "34": 16368,
+        "37": 20837,
+        "13": 31019,
+        "41": 29610,
+        "35": 31070,
+        "9": 28673,
+        "42": 43605,
+        "30": 12100,
+        "49": 15204,
+        "8": 34127,
+        "40": 34598,
+        "7": 31722,
+        "3": 31106,
+        "15": 18618,
+        "45": 33300,
+        "26": 20128,
+        "6": 19003,
+        "28": 7628,
+        "22": 40011,
+        "19": 15173,
+        "10": 46845,
+        "1": 51108,
+        "38": 21259,
+        "24": 23997,
+        "18": 8245,
+        "44": 27383,
+        "12": 13295,
+        "2": 32269,
+        "46": 23068,
+        "11": 29320,
+        "16": 11806,
+        "31": 18759,
+        "27": 10219
+      },
+      "min_time_step": 1,
+      "max_time_step": 49
+    },
+    "edges": {
+      "rows": 2868964,
+      "unique_nodes": 822942,
+      "self_loops": 45981,
+      "invalid_rows": 0,
+      "unique_sources": 400212,
+      "unique_targets": 641043,
+      "max_in_degree": 12019,
+      "max_out_degree": 37835,
+      "schema": {
+        "source": "input_address",
+        "target": "output_address",
+        "amount": null,
+        "asset": null,
+        "timestamp": null,
+        "timestep": null
+      }
+    },
+    "joins": {
+      "feature_wallet_ids_with_class": 822942,
+      "feature_wallet_ids_without_class": 0,
+      "class_wallet_ids_without_features": 0
+    }
+  },
+  "rrr_feature_compatibility": {
+    "schema_version": "RRRFeatureSchemaV1",
+    "proposed_features": {
+      "transaction": {
+        "incoming_tx_count": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "outgoing_tx_count": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "unique_senders": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "unique_receivers": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "total_in": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "total_out": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "mean_in": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "mean_out": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "out_in_ratio": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        }
+      },
+      "temporal": {
+        "activity_duration": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "burstiness": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        }
+      },
+      "graph": {
+        "in_degree": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "out_degree": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "total_degree": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "fan_in_score": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "fan_out_score": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        },
+        "repeated_counterparty_ratio": {
+          "training": "derivable",
+          "runtime": "derivable_from_persisted_RRR_trace",
+          "leakage_safe": true
+        }
+      },
+      "case_path": {},
+      "cross_chain": {}
+    },
+    "incompatible_or_unavailable": [
+      "asset_diversity: Elliptic++ is BTC-only; not discriminative for training/runtime parity",
+      "mean_interarrival/median_interarrival: dataset has block/timestep summaries, not transaction timestamps",
+      "rapid_forward_ratio: not directly derivable from the static edge list",
+      "hop_distance_from_source/path_depth/amount_retention: case/path context is absent from the wallet labels and edge list has no amounts",
+      "bridge_interaction_count/chain_switch_count: absent from Ellipt++",
+      "clustering_coefficient/local_pagerank: computationally possible but deferred from V1 pending scale/definition validation",
+      "class 3 is UNKNOWN and must be excluded from supervised training",
+      "neighbor ground-truth labels are excluded to prevent leakage",
+      "Chainabuse NO_MATCH must not be used as a supervised label"
+    ]
+  },
+  "dependencies": {
+    "pandas": false,
+    "pyarrow": false,
+    "xgboost": false,
+    "scikit_learn": false,
+    "joblib": false,
+    "matplotlib": false
+  }
+}

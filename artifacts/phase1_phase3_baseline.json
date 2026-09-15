@@ -1,0 +1,23 @@
+{
+  "baseline": {
+    "backend": {"command": "python -m pytest -q apps/api/tests", "passed": 150, "failed": 0, "errors": 0, "skipped": 3},
+    "frontend_tests": {"passed": 1, "failed": 0},
+    "frontend_build": "PASSED",
+    "localhost_dependent_tests": "NONE_OBSERVED_IN_DEFAULT_RUN",
+    "standardized_report_contract": "GREEN"
+  },
+  "frozen_model": {
+    "model_sha256": "5d36a620e91c39e521a953714196bdd09fec28d73560d8c98755514579257da5",
+    "metadata_sha256": "0e6db36935b6e21688b1eab24297c3fc2981bb950db00886e5d52f085c29725c"
+  },
+  "realtime_demo": {
+    "fixture": "RRR-DEMO-REALTIME-001",
+    "data_origin": "DEVELOPMENT_FIXTURE",
+    "initial_hybrid": "P2",
+    "post_event_hybrid": "P1",
+    "alert_lifecycle": "PROVEN",
+    "duplicate_replay": "IDEMPOTENT",
+    "artifact": "artifacts/phase1_phase3_realtime_demo.json"
+  },
+  "status": "FROZEN_BASELINE"
+}

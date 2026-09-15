@@ -62,6 +62,11 @@ The API uses PostgreSQL as its source of truth. On startup it applies ordered mi
 - `GET /api/v1/cases/{case_id}/intelligence`
 - `GET /api/v1/cases/{case_id}/vasp-candidates`
 - `POST /api/v1/cases/{case_id}/vasp-action-package`
+- `GET /api/v1/wallets/{chain}/{address}/threat-intelligence`
+- `GET /api/v1/cases/{case_id}/threat-intelligence`
+- `POST /api/v1/cases/{case_id}/threat-intelligence/refresh`
+- `GET /api/v1/cases/{case_id}/recommendations`
+- `POST /api/v1/cases/{case_id}/recommendations/refresh`
 - `GET /api/v1/risk-registry/search`
 - `GET /health`
 - `GET /api/v1/system/status`
@@ -90,6 +95,10 @@ The API uses PostgreSQL as its source of truth. On startup it applies ordered mi
 See [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/development-status.md](docs/development-status.md) for scope and limitations.
 
 The investigator web also provides the current workstation shell, dashboard, manual intake flow, persisted case reopening, evidence-backed wallet intelligence lookup, case overview, and operational transaction graph inspector. Entity, evidence, alert, and report workspaces are capability-ready surfaces backed only where the current API supports them. SAHYOG/NCRP are explicitly marked simulated/not connected, and real-time monitoring is not configured.
+
+## Phase 7 - Threat intelligence and recommendations
+
+Threat intelligence is provider-backed and persisted with source, version, confidence, reference, retrieval time, and raw status. Set `CHAINABUSE_API_KEY` to enable the Chainabuse provider; without a configured provider, refresh returns `NOT_CONFIGURED`, never a false `NO_MATCH`. Threat-intelligence refresh is explicit and is not run automatically by dashboard reads. Investigator recommendations are deterministic snapshots generated from persisted risk, watch, VASP, Case Fusion, cross-chain, and threat-intelligence state; they are review prompts, not criminality claims or automatic enforcement actions.
 
 ## Safety boundary
 

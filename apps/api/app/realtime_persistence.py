@@ -19,7 +19,7 @@ class RealtimePersistenceMixin:
     def _watch_from_row(self,row):
         assets=row["allowed_assets"] or []
         if isinstance(assets,str): assets=json.loads(assets)
-        return WatchTarget(watch_id=str(row["watch_id"]),case_id=str(row["case_id"]),address=row["address"],chain=row["chain"],source=row["source"],created_at=row["created_at"],status=row["status"],provider=row["provider"],subscription_id=row["subscription_id"],last_event_at=row["last_event_at"],last_processed_block=row["last_processed_block"],last_processed_event=row["last_processed_event"],expansion_policy=row["expansion_policy"],max_hops=row["max_hops"],max_new_nodes_per_event=row["max_new_nodes_per_event"],max_new_edges_per_event=row["max_new_edges_per_event"],max_value=float(row["max_value"]),allowed_assets=assets,error=row["error"])
+        return WatchTarget(watch_id=str(row["watch_id"]),case_id=str(row["case_id"]),address=row["address"],chain=row["chain"],source=row["source"],created_at=row["created_at"],status=row["status"],provider=row["provider"],subscription_id=row["subscription_id"],last_event_at=row["last_event_at"],last_retrace_at=row.get("last_retrace_at"),last_processed_block=row["last_processed_block"],last_processed_event=row["last_processed_event"],expansion_policy=row["expansion_policy"],max_hops=row["max_hops"],max_new_nodes_per_event=row["max_new_nodes_per_event"],max_new_edges_per_event=row["max_new_edges_per_event"],max_value=float(row["max_value"]),allowed_assets=assets,error=row["error"])
 
     async def list_watches(self,case_id:str):
         from .persistence import DatabaseError
@@ -47,7 +47,7 @@ class RealtimePersistenceMixin:
         from .persistence import DatabaseError
         try:
             async with self._require_pool().acquire() as conn:
-                await conn.execute("UPDATE watch_targets SET status=$3,last_event_at=$4,last_processed_block=$5,last_processed_event=$6,subscription_id=$7,error=$8 WHERE case_id=$1 AND watch_id=$2",UUID(watch.case_id),UUID(watch.watch_id),watch.status,watch.last_event_at,watch.last_processed_block,watch.last_processed_event,watch.subscription_id,watch.error)
+                await conn.execute("UPDATE watch_targets SET status=$3,last_event_at=$4,last_retrace_at=$5,last_processed_block=$6,last_processed_event=$7,subscription_id=$8,error=$9 WHERE case_id=$1 AND watch_id=$2",UUID(watch.case_id),UUID(watch.watch_id),watch.status,watch.last_event_at,watch.last_retrace_at,watch.last_processed_block,watch.last_processed_event,watch.subscription_id,watch.error)
             return await self.get_watch(watch.case_id,watch.watch_id)
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Watch could not be updated") from exc
 
@@ -69,6 +69,22 @@ class RealtimePersistenceMixin:
                     event=event.model_copy(update={"processing_status":RealtimeProcessingStatus.DUPLICATE})
             return event,duplicate
         except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Realtime event could not be persisted") from exc
+
+    async def ingest_webhook_delivery(self, delivery_id: str, provider: str, event_id: str | None, received_at: datetime, raw_reference: dict) -> bool:
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn:
+                inserted = await conn.fetchval("""INSERT INTO webhook_deliveries(delivery_id,provider,event_id,received_at,processing_status,raw_reference,updated_at)
+                    VALUES($1,$2,$3,$4,'RECEIVED',$5,$4) ON CONFLICT(delivery_id) DO NOTHING RETURNING delivery_id""", delivery_id, provider, event_id, received_at, json.dumps(raw_reference))
+            return inserted is not None
+        except (asyncpg.PostgresError,ValueError) as exc: raise DatabaseError("Webhook delivery could not be persisted") from exc
+
+    async def update_webhook_delivery(self, delivery_id: str, status: str, error: str | None = None):
+        from .persistence import DatabaseError
+        try:
+            async with self._require_pool().acquire() as conn:
+                await conn.execute("UPDATE webhook_deliveries SET processing_status=$2,error=$3,updated_at=$4 WHERE delivery_id=$1", delivery_id, status, error, datetime.now(timezone.utc))
+        except asyncpg.PostgresError as exc: raise DatabaseError("Webhook delivery status could not be updated") from exc
 
     def _event_from_row(self,row):
         raw=row["raw_provider_reference"] or {}
@@ -114,7 +130,10 @@ class RealtimePersistenceMixin:
 
     async def change_sets(self,case_id:str):
         async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM change_sets WHERE case_id=$1 ORDER BY created_at DESC",UUID(case_id))
-        return [InvestigationChangeSet(change_set_id=str(row["change_set_id"]),case_id=str(row["case_id"]),event_id=row["realtime_event_id"] or "",created_at=row["created_at"],before=json.loads(row["before_state"]) if isinstance(row["before_state"],str) else (row["before_state"] or {}),after=json.loads(row["after_state"]) if isinstance(row["after_state"],str) else (row["after_state"] or {}),changes=json.loads(row["changes"]) if isinstance(row["changes"],str) else (row["changes"] or {})) for row in rows]
+        def val(row, key, default):
+            value = row.get(key, default)
+            return json.loads(value) if isinstance(value, str) else (value if value is not None else default)
+        return [InvestigationChangeSet(change_set_id=str(row["change_set_id"]),case_id=str(row["case_id"]),event_id=row["realtime_event_id"] or "",trigger_event_id=row.get("trigger_event_id") or row["realtime_event_id"],created_at=row["created_at"],before=val(row,"before_state",{}),after=val(row,"after_state",{}),changes=val(row,"changes",{}),new_transactions=val(row,"new_transactions",[]),new_wallets=val(row,"new_wallets",[]),new_edges=val(row,"new_edges",[]),new_patterns=val(row,"new_patterns",[]),risk_before=val(row,"risk_before",{}),risk_after=val(row,"risk_after",{}),risk_delta=float(row.get("risk_delta",0) or 0),vasp_before=val(row,"vasp_before",[]),vasp_after=val(row,"vasp_after",[]),new_related_cases=val(row,"new_related_cases",[]),new_recommendations=val(row,"new_recommendations",[]),alerts_generated=val(row,"alerts_generated",[]),processed_at=row.get("processed_at")) for row in rows]
 
     async def alerts(self,case_id:str):
         async with self._require_pool().acquire() as conn: rows=await conn.fetch("SELECT * FROM alerts WHERE case_id=$1 ORDER BY created_at DESC",UUID(case_id))
@@ -130,7 +149,8 @@ class RealtimePersistenceMixin:
 
     async def append_change_set(self,change_set:InvestigationChangeSet):
         async with self._require_pool().acquire() as conn:
-            await conn.execute("INSERT INTO change_sets(change_set_id,case_id,realtime_event_id,created_at,before_state,after_state,changes) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(change_set_id) DO NOTHING",UUID(change_set.change_set_id),UUID(change_set.case_id),change_set.event_id,change_set.created_at,json.dumps(change_set.before),json.dumps(change_set.after),json.dumps(change_set.changes))
+            await conn.execute("""INSERT INTO change_sets(change_set_id,case_id,realtime_event_id,trigger_event_id,created_at,before_state,after_state,changes,new_transactions,new_wallets,new_edges,new_patterns,risk_before,risk_after,risk_delta,vasp_before,vasp_after,new_related_cases,new_recommendations,alerts_generated,processed_at)
+                VALUES($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) ON CONFLICT(change_set_id) DO NOTHING""",UUID(change_set.change_set_id),UUID(change_set.case_id),change_set.event_id,change_set.created_at,json.dumps(change_set.before),json.dumps(change_set.after),json.dumps(change_set.changes),json.dumps(change_set.new_transactions),json.dumps(change_set.new_wallets),json.dumps(change_set.new_edges),json.dumps(change_set.new_patterns),json.dumps(change_set.risk_before),json.dumps(change_set.risk_after),change_set.risk_delta,json.dumps(change_set.vasp_before),json.dumps(change_set.vasp_after),json.dumps(change_set.new_related_cases),json.dumps(change_set.new_recommendations),json.dumps(change_set.alerts_generated),change_set.processed_at or change_set.created_at)
 
     async def create_alert(self,alert:Alert,fingerprint:str):
         async with self._require_pool().acquire() as conn:

@@ -95,7 +95,7 @@ export function RiskPage({
     ? 'RISK NOT YET ASSESSED'
     : 'LOADING';
 
-  const bandClass = assessment ? `risk-band-${assessment.band.toLowerCase()}` : '';
+  const bandClass = assessment?.band ? `risk-band-${assessment.band.toLowerCase()}` : '';
 
   const short = (val: string) => (val && val.length > 16 ? `${val.slice(0, 8)}…${val.slice(-6)}` : val);
 

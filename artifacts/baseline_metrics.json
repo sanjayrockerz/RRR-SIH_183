@@ -1,0 +1,42 @@
+{
+  "model_name": "RandomForest baseline",
+  "model_version": "rrr_wallet_rf_baseline_v1",
+  "threshold": 0.5,
+  "training_timestamp": "2026-09-08T06:37:38.341040+00:00",
+  "rows": {
+    "train": 197220,
+    "validation": 39051,
+    "test": 55148
+  },
+  "metrics": {
+    "accuracy": 0.8941031406397331,
+    "precision": 0.14366197183098592,
+    "recall": 0.2598980791846335,
+    "f1": 0.18504046888082612,
+    "macro_f1": 0.5642064557145331,
+    "roc_auc": 0.6164223340442238,
+    "pr_auc": 0.08764119671237262,
+    "confusion_matrix": [
+      [
+        48645,
+        3952
+      ],
+      [
+        1888,
+        663
+      ]
+    ],
+    "class_metrics": {
+      "LICIT": {
+        "precision": 0.9626382759780737,
+        "recall": 0.9248626347510315,
+        "f1": 0.94337244254824
+      },
+      "ILLICIT": {
+        "precision": 0.14366197183098592,
+        "recall": 0.2598980791846335,
+        "f1": 0.18504046888082612
+      }
+    }
+  }
+}

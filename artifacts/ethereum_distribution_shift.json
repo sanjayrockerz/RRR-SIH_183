@@ -1,0 +1,420 @@
+{
+  "threshold": 0.25,
+  "features": {
+    "incoming_tx_count": {
+      "train_median": 4.0,
+      "test_median": 4.0,
+      "psi": 0.0055400363488770175,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 10000.0,
+      "test_min": 0.0,
+      "test_max": 9999.0
+    },
+    "outgoing_tx_count": {
+      "train_median": 3.0,
+      "test_median": 3.0,
+      "psi": 0.004861844687148478,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9999.0,
+      "test_min": 0.0,
+      "test_max": 10000.0
+    },
+    "total_tx_count": {
+      "train_median": 9.0,
+      "test_median": 8.0,
+      "psi": 0.011992592546281738,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 19995.0,
+      "test_min": 0.0,
+      "test_max": 16736.0
+    },
+    "unique_senders": {
+      "train_median": 2.0,
+      "test_median": 2.0,
+      "psi": 0.0033101550683695847,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9999.0,
+      "test_min": 0.0,
+      "test_max": 3441.0
+    },
+    "unique_receivers": {
+      "train_median": 2.0,
+      "test_median": 2.0,
+      "psi": 0.0011125554720991077,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 6564.0,
+      "test_min": 0.0,
+      "test_max": 6711.0
+    },
+    "total_value_in": {
+      "train_median": 31.77877829,
+      "test_median": 29.99,
+      "psi": 0.004217773235534049,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 6816796.922,
+      "test_min": 0.0,
+      "test_max": 28581590.07
+    },
+    "total_value_out": {
+      "train_median": 13.03270291,
+      "test_median": 11.864251,
+      "psi": 0.004677030068112185,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 6367315.304,
+      "test_min": 0.0,
+      "test_max": 28580960.89
+    },
+    "mean_value_in": {
+      "train_median": 1.7073167818181818,
+      "test_median": 1.767,
+      "psi": 0.006361570195022868,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 283618.83166666667,
+      "test_min": 0.0,
+      "test_max": 10000.0
+    },
+    "mean_value_out": {
+      "train_median": 1.6681230769230768,
+      "test_median": 1.4958939393939394,
+      "psi": 0.0023419114422601637,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 12000.0,
+      "test_min": 0.0,
+      "test_max": 4999.999559000001
+    },
+    "min_value_in": {
+      "train_median": 0.095,
+      "test_median": 0.09,
+      "psi": 0.003951398656280578,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 10000.0,
+      "test_min": 0.0,
+      "test_max": 10000.0
+    },
+    "max_value_in": {
+      "train_median": 6.0,
+      "test_median": 5.616719,
+      "psi": 0.004775361338722024,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 800000.0,
+      "test_min": 0.0,
+      "test_max": 611102.0145
+    },
+    "min_value_out": {
+      "train_median": 0.049952,
+      "test_median": 0.02355,
+      "psi": 0.006159738225664647,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 12000.0,
+      "test_min": 0.0,
+      "test_max": 4999.999118
+    },
+    "max_value_out": {
+      "train_median": 5.0,
+      "test_median": 4.677857,
+      "psi": 0.0046837111369865,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 250000.0,
+      "test_min": 0.0,
+      "test_max": 520000.0
+    },
+    "activity_duration": {
+      "train_median": 49643.1,
+      "test_median": 47731.28,
+      "psi": 0.006269264089047989,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 1947768.85,
+      "test_min": 0.0,
+      "test_max": 1932152.23
+    },
+    "sent_interarrival_mean": {
+      "train_median": 18.42,
+      "test_median": 17.51,
+      "psi": 0.004358357475881335,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 377913.42,
+      "test_min": 0.0,
+      "test_max": 274972.69
+    },
+    "received_interarrival_mean": {
+      "train_median": 537.43,
+      "test_median": 471.9700000000001,
+      "psi": 0.0035844542392416755,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 482175.49,
+      "test_min": 0.0,
+      "test_max": 348282.62
+    },
+    "created_contract_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0010519559863813594,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9995.0,
+      "test_min": 0.0,
+      "test_max": 2550.0
+    },
+    "token_transfer_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0025356538922167403,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 10001.0,
+      "test_min": 0.0,
+      "test_max": 10000.0
+    },
+    "unique_contract_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.006052826019395728,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 782.0,
+      "test_min": 0.0,
+      "test_max": 214.0
+    },
+    "erc20_missing_indicator": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 1.0,
+      "test_min": 0.0,
+      "test_max": 1.0
+    },
+    "unique_counterparties": {
+      "train_median": 4.0,
+      "test_median": 4.0,
+      "psi": 0.0034636931771079345,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 10000.0,
+      "test_min": 0.0,
+      "test_max": 6716.0
+    },
+    "in_out_tx_ratio": {
+      "train_median": 0.8571428571428571,
+      "test_median": 0.8468468468468469,
+      "psi": 0.00511518717088581,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9999.0,
+      "test_min": 0.0,
+      "test_max": 103.0
+    },
+    "out_in_value_ratio": {
+      "train_median": 0.999559,
+      "test_median": 0.9995938425959271,
+      "psi": 0.0011647415723450459,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 823276.832031691,
+      "test_min": 0.0,
+      "test_max": 7802677.02
+    },
+    "net_flow_ratio": {
+      "train_median": 9.039633204697328e-05,
+      "test_median": 9.398224616747659e-05,
+      "psi": 0.002545376138573674,
+      "substantial_shift": false,
+      "train_min": -1.0,
+      "train_max": 1.0,
+      "test_min": -1.0,
+      "test_max": 1.0
+    },
+    "counterparty_reuse_count": {
+      "train_median": 2.0,
+      "test_median": 2.0,
+      "psi": 0.006291793400932097,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 19993.0,
+      "test_min": 0.0,
+      "test_max": 15897.0
+    },
+    "counterparty_reuse_ratio": {
+      "train_median": 0.25,
+      "test_median": 0.25,
+      "psi": 0.0012889465622109564,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 1.0,
+      "test_min": 0.0,
+      "test_max": 1.0
+    },
+    "transactions_per_active_period": {
+      "train_median": 0.7620276674253722,
+      "test_median": 0.8868652402481916,
+      "psi": 0.008564525580078758,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 4963.429178069916,
+      "test_min": 0.0,
+      "test_max": 513.5762453867301
+    },
+    "contract_interaction_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0010519559863813594,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9995.0,
+      "test_min": 0.0,
+      "test_max": 2550.0
+    },
+    "contract_interaction_ratio": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.000536938883722094,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 1.0,
+      "test_min": 0.0,
+      "test_max": 1.0
+    },
+    "log1p_incoming_tx_count": {
+      "train_median": 1.6094379124341003,
+      "test_median": 1.6094379124341003,
+      "psi": 0.0055400363488770175,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.210440366976517,
+      "test_min": 0.0,
+      "test_max": 9.210340371976184
+    },
+    "log1p_outgoing_tx_count": {
+      "train_median": 1.3862943611198906,
+      "test_median": 1.3862943611198906,
+      "psi": 0.004861844687148478,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.210340371976184,
+      "test_min": 0.0,
+      "test_max": 9.210440366976517
+    },
+    "log1p_total_tx_count": {
+      "train_median": 2.302585092994046,
+      "test_median": 2.1972245773362196,
+      "psi": 0.011992592546281738,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.903287532533462,
+      "test_min": 0.0,
+      "test_max": 9.725377116513638
+    },
+    "log1p_unique_senders": {
+      "train_median": 1.0986122886681098,
+      "test_median": 1.0986122886681098,
+      "psi": 0.0033101550683695847,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.210340371976184,
+      "test_min": 0.0,
+      "test_max": 8.143807976771484
+    },
+    "log1p_unique_receivers": {
+      "train_median": 1.0986122886681098,
+      "test_median": 1.0986122886681098,
+      "psi": 0.0011125554720991077,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 8.789507786736896,
+      "test_min": 0.0,
+      "test_max": 8.811652248147043
+    },
+    "log1p_unique_counterparties": {
+      "train_median": 1.6094379124341003,
+      "test_median": 1.6094379124341003,
+      "psi": 0.0034636931771079345,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.210440366976517,
+      "test_min": 0.0,
+      "test_max": 8.812396905266864
+    },
+    "log1p_total_value_in": {
+      "train_median": 3.4897813026394444,
+      "test_median": 3.433664571799657,
+      "psi": 0.004281633987809339,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 15.734900406660724,
+      "test_min": 0.0,
+      "test_max": 17.168273399665214
+    },
+    "log1p_total_value_out": {
+      "train_median": 2.6413905277332357,
+      "test_median": 2.554452224062178,
+      "psi": 0.004677030068112185,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 15.666688636420787,
+      "test_min": 0.0,
+      "test_max": 17.16825138595283
+    },
+    "log1p_activity_duration": {
+      "train_median": 10.812634830589499,
+      "test_median": 10.773363177557986,
+      "psi": 0.006265823698546926,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 14.482195609387484,
+      "test_min": 0.0,
+      "test_max": 14.474145602203805
+    },
+    "log1p_token_transfer_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0025356538922167403,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.21054035197885,
+      "test_min": 0.0,
+      "test_max": 9.210440366976517
+    },
+    "log1p_unique_contract_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.006052826019395728,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 6.663132695990803,
+      "test_min": 0.0,
+      "test_max": 5.3706380281276624
+    },
+    "log1p_created_contract_count": {
+      "train_median": 0.0,
+      "test_median": 0.0,
+      "psi": 0.0010519559863813594,
+      "substantial_shift": false,
+      "train_min": 0.0,
+      "train_max": 9.209940291954844,
+      "test_min": 0.0,
+      "test_max": 7.844240718141811
+    }
+  },
+  "class_prevalence": {
+    "train": 0.22194731480133897,
+    "validation": 0.23641304347826086,
+    "test": 0.20773930753564154
+  }
+}

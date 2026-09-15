@@ -1,0 +1,16 @@
+{
+  "source_dataset": "Ethereum Fraud Detection Dataset",
+  "local_file": "data/Datasets/transaction_dataset.csv",
+  "mapping": {
+    "0": "LICIT_LIKE",
+    "1": "HIGH_RISK_LIKE"
+  },
+  "original_field": "FLAG",
+  "normalized_field": "normalized_label",
+  "raw_counts": {
+    "FLAG=0": 7662,
+    "FLAG=1": 2179
+  },
+  "label_scope": "Behavioural fraud-indicator target normalized for RRR; not a claim of criminality.",
+  "verified_by_user": true
+}

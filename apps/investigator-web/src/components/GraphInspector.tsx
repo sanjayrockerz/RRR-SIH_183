@@ -5,12 +5,12 @@ import { api } from '../api';
 const short = (value: string) => value && value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
 const nodeKey = (node: Node) => node.id || node.address;
 const chainKey = (chain: string | undefined) => chain || 'ethereum';
-const identity = (chain: string | undefined, address: string) => `${chainKey(chain)}:${chainKey(chain) === 'ethereum' ? address.toLowerCase() : address}`;
+const identity = (chain: string | undefined, address?: string) => `${chainKey(chain)}:${chainKey(chain) === 'ethereum' ? (address || '').toLowerCase() : (address || '')}`;
 
 type Point = { x: number; y: number };
 
 function layout(nodes: Node[], edges: Edge[], root: string) {
-  const rootKey = identity(nodes.find(node => node.address.toLowerCase() === root.toLowerCase())?.chain, root);
+  const rootKey = identity(nodes.find(node => (node.address || '').toLowerCase() === (root || '').toLowerCase())?.chain, root);
   const adjacency = new Map<string, string[]>();
   for (const edge of edges) {
     const source = identity(edge.transfer.chain, edge.source);
@@ -162,10 +162,10 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
   const primaryTransactions = new Set(primaryPath?.transaction_hashes || []);
   const primaryEdges = new Set(primaryPath?.edge_ids || []);
   const primaryNodes = new Set((primaryPath?.node_ids || []).map(address => address.toLowerCase()));
-  const edgeFactors = (item: Edge) => risk?.factors.filter(factor => factor.transaction_hashes.includes(item.transaction_hash)) || [];
+  const edgeFactors = (item: Edge) => risk?.factors.filter(factor => (factor.transaction_hashes || []).includes(item.transaction_hash)) || [];
   const pathRisk = useMemo(() => calculatePathRisk(primaryPath, trace, risk), [primaryPath, trace, risk]);
   const selectedEdgeFactors = (item: Edge) => pathRisk.edgeFactors[item.edge_id] || [];
-  const nodeFactors = (item: Node) => risk?.factors.filter(factor => factor.transaction_hashes.some(tx => trace.edges.some(itemEdge => itemEdge.transaction_hash === tx && (itemEdge.source === item.address || itemEdge.target === item.address)))) || [];
+  const nodeFactors = (item: Node) => risk?.factors.filter(factor => (factor.transaction_hashes || []).some(tx => trace.edges.some(itemEdge => itemEdge.transaction_hash === tx && (itemEdge.source === item.address || itemEdge.target === item.address)))) || [];
 
   const handleMouseDownSvg = (e: React.MouseEvent<SVGSVGElement>) => {
     if ((e.target as SVGElement).tagName === 'svg' || (e.target as SVGElement).className === 'graph-grid-lines') {
@@ -652,7 +652,7 @@ function GraphAnalysisRail({ trace, edges, primaryPath, pathRisk }: { trace: Tra
         <div className="primary-path-facts"><div><small>OBSERVED TERMINAL ADDRESS</small><b className="mono">{primaryPath?.terminal_address || 'UNKNOWN'}</b></div><div><small>ATTRIBUTED VASP ENDPOINT</small><b>{primaryPath?.status === 'ATTRIBUTED' ? primaryPath.terminal_entity_name : 'UNKNOWN / UNATTRIBUTED'}</b></div><div><small>TYPE</small><b>{primaryPath?.terminal_entity_type || 'UNKNOWN'}</b></div><div><small>HOPS / TRANSACTIONS</small><b>{primaryPath?.hops ?? 0} / {primaryPath?.transaction_count ?? primaryPath?.transaction_hashes?.length ?? 0}</b></div><div><small>ATTRIBUTION</small><b>{primaryPath?.attribution || 'UNKNOWN'}</b></div><div><small>TOTAL / DURATION</small><b>{primaryPath?.total_transferred_value || 'UNKNOWN'} / {formatDuration(primaryPath?.path_duration_seconds)}</b></div></div>
         <div className="primary-path-why"><small>WHY THIS ENDPOINT</small><span>{primaryPath?.why || 'Primary path calculation unavailable.'}</span></div>
         <div className="primary-path-why"><small>EVIDENCE</small><span>{primaryPath?.transaction_hashes?.length ? primaryPath.transaction_hashes.map(short).join(' | ') : 'No linked transaction evidence'}</span></div>
-        <div className="primary-path-risk"><small>SELECTED PATH RISK</small><strong className={`risk-level-${pathRisk.level.toLowerCase()}`}>{pathRisk.score.toFixed(1)} / 100 · {pathRisk.level}</strong><span>{pathRisk.factors.length ? pathRisk.factors.map(item => `${item.name}: ${item.explanation}`).join(' | ') : 'No path-linked risk factors. Observed transfers remain separate from risk overlays.'}</span></div>
+        <div className="primary-path-risk"><small>SELECTED PATH RISK</small><strong className={`risk-level-${(pathRisk.level || 'low').toLowerCase()}`}>{pathRisk.score.toFixed(1)} / 100 · {pathRisk.level}</strong><span>{pathRisk.factors.length ? pathRisk.factors.map(item => `${item.name}: ${item.explanation}`).join(' | ') : 'No path-linked risk factors. Observed transfers remain separate from risk overlays.'}</span></div>
       </div>
       <div className="analysis-heading">
         <div>
@@ -712,11 +712,11 @@ type PathRisk = { score: number; level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'; 
 function calculatePathRisk(primaryPath: PrimaryPath | null, trace: Trace, assessment: RiskAssessment | null): PathRisk {
   const selectedTx = new Set(primaryPath?.transaction_hashes || []);
   const selectedEdges = new Set(primaryPath?.edge_ids || []);
-  const factors = (assessment?.factors || []).filter(factor => factor.transaction_hashes.some(tx => selectedTx.has(tx)));
+  const factors = (assessment?.factors || []).filter(factor => (factor.transaction_hashes || []).some(tx => selectedTx.has(tx)));
   const edgeFactors: Record<string, RiskAssessment['factors']> = {};
   for (const edge of trace.edges) {
     if ((selectedEdges.size && !selectedEdges.has(edge.edge_id)) || (!selectedEdges.size && !selectedTx.has(edge.transaction_hash))) continue;
-    edgeFactors[edge.edge_id] = factors.filter(factor => factor.transaction_hashes.includes(edge.transaction_hash));
+    edgeFactors[edge.edge_id] = factors.filter(factor => (factor.transaction_hashes || []).includes(edge.transaction_hash));
   }
   const score = Math.round(Math.min(100, factors.reduce((sum, factor) => sum + factor.contribution, 0) * 100 / 156) * 10) / 10;
   const level = score >= 75 ? 'CRITICAL' : score >= 50 ? 'HIGH' : score >= 25 ? 'MEDIUM' : 'LOW';

@@ -1,5 +1,6 @@
 """Application orchestration for provider events and incremental retracing."""
 from datetime import datetime, timezone
+import asyncio
 from hashlib import sha256
 from uuid import uuid4
 import json
@@ -12,7 +13,7 @@ import logging
 
 
 class RealtimeService:
-    def __init__(self, repository, provider: RealtimeProvider, pattern_service, risk_service, cross_chain_service=None, graph_projection=None, event_bus=None):
+    def __init__(self, repository, provider: RealtimeProvider, pattern_service, risk_service, cross_chain_service=None, graph_projection=None, event_bus=None, threat_intel_service=None, recommendation_service=None, case_fusion_service=None, vasp_resolver=None, ml_service=None, hybrid_service=None):
         self.repository = repository
         self.provider = provider
         self.pattern_service = pattern_service
@@ -21,6 +22,12 @@ class RealtimeService:
         self.cross_chain_service = cross_chain_service
         self.graph_projection = graph_projection
         self.event_bus = event_bus
+        self.threat_intel_service = threat_intel_service
+        self.recommendation_service = recommendation_service
+        self.case_fusion_service = case_fusion_service
+        self.vasp_resolver = vasp_resolver
+        self.ml_service = ml_service
+        self.hybrid_service = hybrid_service
 
     async def _publish(self,event_type: str,event: RealtimeEvent,case_id: str | None = None,payload: dict | None = None):
         if not self.event_bus: return
@@ -64,12 +71,27 @@ class RealtimeService:
             await self.provider.unsubscribe(watch.subscription_id)
         return await self.repository.update_watch(watch.model_copy(update={"status": status}))
 
-    async def receive_webhook(self, payload: dict, raw_body: bytes, signature: str | None):
+    async def receive_webhook(self, payload: dict, raw_body: bytes, signature: str | None, delivery_id: str | None = None):
         verifier = getattr(self.provider, "verify_signature", None)
         if not verifier or not verifier(raw_body, signature):
             raise PermissionError("Webhook signature validation failed")
-        events = self.normalizer.normalize(payload)
-        return await self._process_events(events)
+        delivery_id = delivery_id or str(payload.get("id") or payload.get("webhookId") or sha256(raw_body).hexdigest())
+        event_id = str(payload.get("id") or payload.get("webhookId") or "") or None
+        received_at = datetime.now(timezone.utc)
+        if hasattr(self.repository, "ingest_webhook_delivery"):
+            inserted = await self.repository.ingest_webhook_delivery(delivery_id, "Alchemy", event_id, received_at, {"delivery_id": delivery_id})
+            if not inserted:
+                return []
+        try:
+            events = self.normalizer.normalize(payload, received_at=received_at)
+            result = await self._process_events(events)
+            if hasattr(self.repository, "update_webhook_delivery"):
+                await self.repository.update_webhook_delivery(delivery_id, "PROCESSED")
+            return result
+        except Exception as exc:
+            if hasattr(self.repository, "update_webhook_delivery"):
+                await self.repository.update_webhook_delivery(delivery_id, "RETRY_PENDING", type(exc).__name__)
+            raise
 
     async def receive_simulated(self, event: RealtimeEvent):
         """Explicit test seam; responses remain marked SIMULATED by the API."""
@@ -105,6 +127,15 @@ class RealtimeService:
                         if projected_edges:
                             await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=watch.case_id,timestamp=stored.observed_at or stored.received_at,event_type="GRAPH_PROJECTION_UPDATED",summary="Optional relationship projection updated from the observed realtime event.",source="Neo4jProjection",evidence_ids=[application.evidence_id] if application.evidence_id else [],metadata={"event_id":stored.event_id,"graph_edge_id":application.graph_edge_id}))
                     await self._derive_investigation_state(before, application)
+                    if self.ml_service or self.hybrid_service:
+                        # Development fixtures are deliberately synchronous so
+                        # their readiness/demo response represents the fully
+                        # persisted downstream state. Live provider processing
+                        # retains the non-blocking acknowledgement contract.
+                        if stored.provider == "DEVELOPMENT SYNTHETIC":
+                            await self._run_ml_and_hybrid(application)
+                        else:
+                            asyncio.create_task(self._run_ml_and_hybrid(application))
                     results.append(application)
                 await self.repository.record_realtime_attempt(stored.event_id, RealtimeProcessingStatus.APPLIED)
                 await self._publish("EVIDENCE_CREATED",stored,payload={"processing_status":"APPLIED"})
@@ -117,6 +148,21 @@ class RealtimeService:
                     logging.getLogger("crypto_fraud_intelligence").exception("database_error", extra={"operation":"mark_realtime_failure"})
                 raise
         return results
+
+    async def _run_ml_inference(self, application):
+        try:
+            await self.ml_service.assess(application.case_id, application.event.from_address, application.event.chain)
+        except Exception:
+            logging.getLogger("crypto_fraud_intelligence").exception("ml_realtime_inference_failed", extra={"case_id": application.case_id, "event_id": application.event.event_id})
+
+    async def _run_ml_and_hybrid(self, application):
+        if self.ml_service:
+            await self._run_ml_inference(application)
+        if self.hybrid_service:
+            try:
+                await self.hybrid_service.build_case_intelligence(application.case_id, persist=True)
+            except Exception:
+                logging.getLogger("crypto_fraud_intelligence").exception("hybrid_realtime_refresh_failed", extra={"case_id": application.case_id, "event_id": application.event.event_id})
 
     async def replay(self, event_id: str):
         event = await self.repository.reset_realtime_event(event_id)
@@ -141,6 +187,9 @@ class RealtimeService:
                     await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case.case_id,timestamp=now,event_type="CROSS_CHAIN_ACTIVITY",summary="Cross-chain relationship analysis updated from the new observed event; relationships are explicit confidence-scored inferences.",source="CrossChainEngine",evidence_ids=list(dict.fromkeys(e for link in cross_trace.cross_chain_links for e in link.evidence_ids)),metadata={"trace_id":cross_trace.trace_id,"cross_chain_hops":cross_trace.cross_chain_hops}))
             except ValueError:
                 pass
+        before_risk = await self.repository.latest_risk(case.case_id) if hasattr(self.repository, "latest_risk") else None
+        generated_alert_ids = []
+        recommendations = []
         if case.latest_trace and case.latest_trace.trace_id:
             try:
                 attributions = await self._case_attributions(case.latest_trace)
@@ -161,17 +210,40 @@ class RealtimeService:
                 assessment = await self.risk_service.assess(case.case_id, RiskAssessRequest(trace_id=case.latest_trace.trace_id))
                 await self._publish("RISK_REASSESSED",application.event,case.case_id,{"assessment_id":assessment.assessment_id,"score":assessment.score,"band":assessment.band,"delta":assessment.delta.delta if assessment.delta else 0})
                 await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case.case_id,timestamp=now,event_type="RISK_REASSESSED",summary=f"Investigative risk posture recalculated from persisted evidence: {assessment.band} ({assessment.score:.1f}/100).",source="RuleBasedRiskEngine",evidence_ids=assessment.evidence_ids,metadata={"assessment_id":assessment.assessment_id,"delta":assessment.delta.delta if assessment.delta else 0}))
-                if assessment.delta and assessment.delta.delta > 0:
+                band_order = {"LOW": 0, "GUARDED": 1, "ELEVATED": 2, "HIGH": 3, "CRITICAL": 4}
+                prior_band = str(before_risk.band) if before_risk else "LOW"
+                current_band = str(assessment.band)
+                material_risk_change = bool(assessment.delta and (assessment.delta.delta >= settings.realtime_material_risk_delta_threshold or band_order.get(current_band, 0) > band_order.get(prior_band, 0)))
+                if assessment.delta and material_risk_change:
                     fingerprint = sha256(json.dumps({"case":case.case_id,"assessment":assessment.assessment_id,"delta":assessment.delta.delta,"factors":sorted(f.definition_id for f in assessment.factors)},sort_keys=True).encode()).hexdigest()
-                    await self.repository.create_alert(Alert(alert_id=str(uuid4()),case_id=case.case_id,subject_id=assessment.subject.address,alert_type="RISK_REASSESSMENT",title="NEW INVESTIGATIVE ALERT",explanation="New observed blockchain activity changed the persisted investigative risk posture. Review the linked evidence and factors; this is not a criminality determination.",severity=assessment.band,risk_delta=assessment.delta.delta,pattern_ids=assessment.pattern_ids,evidence_ids=assessment.evidence_ids,created_at=now), fingerprint)
+                    created_alert = await self.repository.create_alert(Alert(alert_id=str(uuid4()),case_id=case.case_id,subject_id=assessment.subject.address,alert_type="RISK_REASSESSMENT",title="NEW INVESTIGATIVE ALERT",explanation="New observed blockchain activity changed the persisted investigative risk posture. Review the linked evidence and factors; this is not a criminality determination.",severity=assessment.band,risk_delta=assessment.delta.delta,pattern_ids=assessment.pattern_ids,evidence_ids=assessment.evidence_ids,created_at=now), fingerprint)
+                    if created_alert:
+                        generated_alert_ids.append(created_alert.alert_id)
                     await self._publish("ALERT_CREATED",application.event,case.case_id,{"risk_delta":assessment.delta.delta,"score":assessment.score,"band":assessment.band})
             except ValueError:
                 # A realtime event remains persisted even when there is no trace to
                 # reassess. The timeline above is the durable observation record.
                 pass
+                if self.recommendation_service:
+                    recommendation_response = await self.recommendation_service.refresh(case.case_id)
+                    recommendations = [item.model_dump(mode="json") for item in recommendation_response.recommendations]
+                    if recommendations:
+                        await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()),case_id=case.case_id,timestamp=now,event_type="RECOMMENDATION_REFRESHED",summary=f"{len(recommendations)} deterministic investigator recommendation(s) generated from current persisted intelligence.",source="RecommendationEngine",evidence_ids=[],metadata={"recommendation_ids":[item["recommendation_id"] for item in recommendations]}))
+                        await self._publish("RECOMMENDATION_GENERATED",application.event,case.case_id,{"recommendation_ids":[item["recommendation_id"] for item in recommendations]})
+                        if any(item["priority"] == "P1" for item in recommendations) and not generated_alert_ids:
+                            alert = await self.repository.create_alert(Alert(alert_id=str(uuid4()),case_id=case.case_id,subject_id=application.event.to_address,alert_type="INVESTIGATOR_RECOMMENDATION",title="INVESTIGATOR REVIEW RECOMMENDED",explanation="A deterministic P1 review recommendation was generated from newly persisted investigation state.",severity=RiskBand.HIGH,risk_delta=0,pattern_ids=[],evidence_ids=evidence_ids,created_at=now), sha256(f"{case.case_id}:{application.event.event_id}:P1_RECOMMENDATION".encode()).hexdigest())
+                            if alert:
+                                generated_alert_ids.append(alert.alert_id)
+            except ValueError:
+                pass
         before_count = len(before.transactions)
         after_count = len(case.transactions)
-        await self.repository.append_change_set(InvestigationChangeSet(change_set_id=str(uuid4()),case_id=case.case_id,event_id=application.event.event_id,created_at=now,before={"transaction_count":before_count},after={"transaction_count":after_count},changes={"transactions_added":after_count-before_count,"graph_edge_id":application.graph_edge_id,"evidence_id":application.evidence_id}))
+        risk_after = await self.repository.latest_risk(case.case_id) if hasattr(self.repository, "latest_risk") else None
+        risk_delta = float((risk_after.score - before_risk.score) if risk_after and before_risk else (risk_after.delta.delta if risk_after and risk_after.delta else 0))
+        await self.repository.append_change_set(InvestigationChangeSet(change_set_id=str(uuid4()),case_id=case.case_id,event_id=application.event.event_id,created_at=now,before={"transaction_count":before_count},after={"transaction_count":after_count},changes={"transactions_added":after_count-before_count,"graph_edge_id":application.graph_edge_id,"evidence_id":application.evidence_id},new_transactions=[application.transaction_id] if application.transaction_id else [],new_wallets=[application.event.to_address] if application.new_wallet else [],new_edges=[application.graph_edge_id] if application.graph_edge_id else [],risk_before=before_risk.model_dump(mode="json") if before_risk else {},risk_after=risk_after.model_dump(mode="json") if risk_after else {},risk_delta=risk_delta,new_recommendations=recommendations,alerts_generated=generated_alert_ids,processed_at=datetime.now(timezone.utc)))
+        watch = await self.repository.get_watch(application.case_id, application.watch_id) if hasattr(self.repository, "get_watch") else None
+        if watch:
+            await self.repository.update_watch(watch.model_copy(update={"last_retrace_at": datetime.now(timezone.utc)}))
 
     async def _case_attributions(self, trace):
         from .attribution import AttributionEngine, NearestEntityResolver

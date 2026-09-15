@@ -1,0 +1,529 @@
+{
+  "schema_version": "RRRFeatureSchemaV2",
+  "feature_order": [
+    "incoming_tx_count",
+    "outgoing_tx_count",
+    "total_tx_count",
+    "unique_senders",
+    "unique_receivers",
+    "total_value_in",
+    "total_value_out",
+    "mean_value_in",
+    "mean_value_out",
+    "min_value_in",
+    "max_value_in",
+    "min_value_out",
+    "max_value_out",
+    "activity_duration",
+    "sent_interarrival_mean",
+    "received_interarrival_mean",
+    "created_contract_count",
+    "token_transfer_count",
+    "unique_contract_count",
+    "erc20_missing_indicator",
+    "unique_counterparties",
+    "in_out_tx_ratio",
+    "out_in_value_ratio",
+    "net_flow_ratio",
+    "counterparty_reuse_count",
+    "counterparty_reuse_ratio",
+    "transactions_per_active_period",
+    "contract_interaction_count",
+    "contract_interaction_ratio",
+    "log1p_incoming_tx_count",
+    "log1p_outgoing_tx_count",
+    "log1p_total_tx_count",
+    "log1p_unique_senders",
+    "log1p_unique_receivers",
+    "log1p_unique_counterparties",
+    "log1p_total_value_in",
+    "log1p_total_value_out",
+    "log1p_activity_duration",
+    "log1p_token_transfer_count",
+    "log1p_unique_contract_count",
+    "log1p_created_contract_count"
+  ],
+  "features": [
+    {
+      "feature_name": "incoming_tx_count",
+      "source_columns": [
+        "Received Tnx"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "outgoing_tx_count",
+      "source_columns": [
+        "Sent tnx"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "total_tx_count",
+      "source_columns": [
+        "total transactions (including tnx to create contract"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "unique_senders",
+      "source_columns": [
+        "Unique Received From Addresses"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "unique_receivers",
+      "source_columns": [
+        "Unique Sent To Addresses"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "total_value_in",
+      "source_columns": [
+        "total ether received"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "total_value_out",
+      "source_columns": [
+        "total Ether sent"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "mean_value_in",
+      "source_columns": [
+        "avg val received"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "mean_value_out",
+      "source_columns": [
+        "avg val sent"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "min_value_in",
+      "source_columns": [
+        "min value received"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "max_value_in",
+      "source_columns": [
+        "max value received "
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "min_value_out",
+      "source_columns": [
+        "min val sent"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "max_value_out",
+      "source_columns": [
+        "max val sent"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "activity_duration",
+      "source_columns": [
+        "Time Diff between first and last (Mins)"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "sent_interarrival_mean",
+      "source_columns": [
+        "Avg min between sent tnx"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "received_interarrival_mean",
+      "source_columns": [
+        "Avg min between received tnx"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "created_contract_count",
+      "source_columns": [
+        "Number of Created Contracts"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "token_transfer_count",
+      "source_columns": [
+        " Total ERC20 tnxs"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "unique_contract_count",
+      "source_columns": [
+        " ERC20 uniq rec contract addr"
+      ],
+      "calculation": "direct numeric mapping",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "erc20_missing_indicator",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "unique_counterparties",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "in_out_tx_ratio",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "out_in_value_ratio",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "net_flow_ratio",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "counterparty_reuse_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "counterparty_reuse_ratio",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "transactions_per_active_period",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "contract_interaction_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "contract_interaction_ratio",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "none",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_incoming_tx_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_outgoing_tx_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_total_tx_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_unique_senders",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_unique_receivers",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_unique_counterparties",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_total_value_in",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_total_value_out",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_activity_duration",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_token_transfer_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_unique_contract_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    },
+    {
+      "feature_name": "log1p_created_contract_count",
+      "source_columns": [
+        "derived from approved RRRFeatureSchemaV2 primitives"
+      ],
+      "calculation": "deterministic runtime-compatible derivation",
+      "runtime_derivation": "PostgreSQL normalized transfer summary / Alchemy-compatible wallet history; contract fields from persisted contract/token transfers",
+      "normalization": "log1p",
+      "missing_value_handling": "ERC20 nulls filled 0 only after verifying all ERC20 activity fields are jointly null; other numeric NaN/zero denominators -> 0",
+      "leakage_status": "approved; no labels, future fields, source identifiers, threat intelligence, risk engine, case fusion, or VASP attribution"
+    }
+  ],
+  "excluded_features": [
+    "median_value_in",
+    "median_value_out",
+    "median_interarrival_time",
+    "min_interarrival_time",
+    "max_interarrival_time",
+    "burstiness",
+    "in_degree",
+    "out_degree",
+    "total_degree",
+    "degree_imbalance",
+    "in_out_degree_ratio",
+    "fan_in_score",
+    "fan_out_score",
+    "graph_activity_density",
+    "native_transfer_count",
+    "token_transfer_ratio",
+    "dataset_source",
+    "chain_name",
+    "RiskEngine_score",
+    "Chainabuse_result",
+    "VASP_attribution"
+  ],
+  "label_contract": {
+    "0": "LICIT_LIKE",
+    "1": "HIGH_RISK_LIKE"
+  },
+  "source_limitations": [
+    "No raw transaction hash/from/to/timestamp/block columns; graph fields are excluded."
+  ]
+}

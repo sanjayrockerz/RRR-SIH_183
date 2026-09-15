@@ -1,0 +1,83 @@
+{
+  "illicit_wallets": 2371,
+  "observations_per_illicit_wallet": {
+    "min": 1,
+    "median": 1.0,
+    "max": 6
+  },
+  "early_validation": {
+    "time_steps": [
+      35,
+      38
+    ],
+    "metrics": {
+      "accuracy": 0.7179289398833342,
+      "precision": 0.20654140570633264,
+      "recall": 0.9082007343941249,
+      "f1": 0.33654609366141286,
+      "macro_f1": 0.5787178382103862,
+      "roc_auc": 0.9428620470350695,
+      "pr_auc": 0.8207875858501471,
+      "confusion_matrix": [
+        [
+          13408,
+          5701
+        ],
+        [
+          150,
+          1484
+        ]
+      ],
+      "class_metrics": {
+        "LICIT": {
+          "precision": 0.9889364213010768,
+          "recall": 0.7016589041812759,
+          "f1": 0.8208895827593596
+        },
+        "ILLICIT": {
+          "precision": 0.20654140570633264,
+          "recall": 0.9082007343941249,
+          "f1": 0.33654609366141286
+        }
+      }
+    }
+  },
+  "late_validation": {
+    "time_steps": [
+      39,
+      49
+    ],
+    "metrics": {
+      "accuracy": 0.6212038453135241,
+      "precision": 0.07351112339367141,
+      "recall": 0.6981627296587927,
+      "f1": 0.1330166270783848,
+      "macro_f1": 0.4453390784691291,
+      "roc_auc": 0.7689349674930209,
+      "pr_auc": 0.37725983204674884,
+      "confusion_matrix": [
+        [
+          10841,
+          6705
+        ],
+        [
+          230,
+          532
+        ]
+      ],
+      "class_metrics": {
+        "LICIT": {
+          "precision": 0.9792250022581519,
+          "recall": 0.6178616208822524,
+          "f1": 0.7576615298598735
+        },
+        "ILLICIT": {
+          "precision": 0.07351112339367141,
+          "recall": 0.6981627296587927,
+          "f1": 0.1330166270783848
+        }
+      }
+    }
+  },
+  "label_noise_note": "Labels are wallet-level; earlier observations may precede the behavior represented by the eventual wallet label. No relabeling was performed."
+}

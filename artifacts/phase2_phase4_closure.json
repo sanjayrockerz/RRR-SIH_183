@@ -1,0 +1,39 @@
+{
+  "DEPLOYMENT": {
+    "health": {"implemented": true, "externally_verified": false},
+    "readiness": {"implemented": true, "externally_verified": false, "requires": ["Supabase DATABASE_URL", "production auth configuration"]},
+    "database": "UNVERIFIED_EXTERNAL",
+    "migrations": {"ordered_runner": true, "schema_migrations": true, "state_contract": ["CURRENT", "PENDING", "FAILED"], "externally_verified": false},
+    "model_integrity": {"status": "READY_LOCAL", "model_sha256": "5d36a620e91c39e521a953714196bdd09fec28d73560d8c98755514579257da", "metadata_sha256": "0e6db36935b6e21688b1eab24297c3fc2981bb950db00886e5d52f085c29725c"},
+    "cors": {"production_origin": "https://crypto-fraud-intelligence-self.vercel.app", "wildcard_credentials": false},
+    "frontend_api_configuration": {"env": "VITE_API_BASE_URL", "production_localhost_fallback": false},
+    "production_smoke": {"script": "scripts/production_smoke.py", "status": "NOT_RUN_NO_DEPLOYED_URL"},
+    "deployed_proof_available": false
+  },
+  "CROSS_CHAIN": {
+    "fixture_id": "RRR-DEMO-CROSSCHAIN-001",
+    "ethereum_source": "0x1111111111111111111111111111111111111111111111111111111111111111",
+    "bridge": "RRR-DEMO-BRIDGE-001",
+    "tron_destination": "2222222222222222222222222222222222222222222222222222222222222222",
+    "confidence": "HIGH",
+    "evidence_refs": ["RRR-DEMO-CROSSCHAIN-001:ETH-SOURCE", "RRR-DEMO-CROSSCHAIN-001:TRON-CONTINUATION"],
+    "vasp_state": "UNKNOWN / UNRESOLVED",
+    "idempotency": "STABLE_CORRELATION_ID_PROVEN",
+    "fail_closed_tests": "PASSED",
+    "result_artifact": "artifacts/cross_chain_demo_eth_tron.json"
+  },
+  "TESTS": {
+    "backend": {"passed": 150, "failed": 0, "errors": 0, "skipped": 3},
+    "frontend_tests": {"passed": 1, "failed": 0},
+    "frontend_build": "PASSED",
+    "ml_hashes_before_after": "UNCHANGED",
+    "focused_closure_tests": {"passed": 31, "failed": 0}
+  },
+  "VERDICT": {
+    "production_db_path_proven": false,
+    "deployment_path_proven": false,
+    "ethereum_tron_demo_proven": true,
+    "safe_for_sih_presentation": true,
+    "remaining_p0_blockers": ["Run scripts/production_smoke.py against the actual Render URL backed by Supabase and retain its passed output."]
+  }
+}

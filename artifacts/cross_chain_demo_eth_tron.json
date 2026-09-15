@@ -1,0 +1,34 @@
+{
+  "fixture": "RRR-DEMO-CROSSCHAIN-001",
+  "source_chain": "ethereum",
+  "destination_chain": "tron",
+  "source_tx": "0x1111111111111111111111111111111111111111111111111111111111111111",
+  "bridge": "RRR-DEMO-BRIDGE-001",
+  "correlation": {
+    "status": "STRONG",
+    "confidence": 0.6,
+    "confidence_label": "HIGH",
+    "reasons": [
+      "matching destination address",
+      "matching asset symbol; contract mapping still requires verification",
+      "temporal correlation within five minutes",
+      "matching observed amount"
+    ]
+  },
+  "destination_tx": "2222222222222222222222222222222222222222222222222222222222222222",
+  "vasp_candidate": {
+    "state": "UNKNOWN / UNRESOLVED",
+    "name": null,
+    "reason": "No source-backed VASP attribution is present in this fixture."
+  },
+  "evidence_refs": [
+    "RRR-DEMO-CROSSCHAIN-001:ETH-SOURCE",
+    "RRR-DEMO-CROSSCHAIN-001:TRON-CONTINUATION"
+  ],
+  "provenance": "DEVELOPMENT_FIXTURE",
+  "limitations": [
+    "Deterministic fixture; not live provider evidence.",
+    "Bounded Ethereum-to-Tron correlation only; not universal cross-chain tracing.",
+    "VASP attribution remains unresolved without source-backed entity evidence."
+  ]
+}

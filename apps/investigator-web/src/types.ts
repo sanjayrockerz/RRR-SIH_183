@@ -39,11 +39,11 @@ export type DashboardSummary={
   latest_alert?:{alert_id:string;title:string;severity:string;created_at:string}|null;
 };
 export type PriorityCase={case_id:string;title:string;external_case_reference?:string|null;fraud_type:string;status:string;workflow_stage:string;risk_band?:string|null;risk_score?:number|null;risk_delta:number;watch_state:string;latest_activity_at?:string|null;vasp_lead_count:number;nearest_vasp?:{entity_id:string;entity_name:string;entity_type:string;chain:string;hop_distance:number;confidence:string;source?:string;transaction_hash?:string}|null;related_case_count:number;open_critical_alerts:number;priority_rank:number;priority_reason:string};
-export type DashboardIntelligence={status:string;critical_cases:number;active_watches:number;vasp_leads:number;high_confidence_vasp_leads:number;cross_chain_cases:number;unresolved_cross_chain_cases:number;related_case_clusters:number;open_alerts:number;critical_alerts:number;priority_cases:PriorityCase[];recent_intelligence_events:Array<{case_id:string;event_type:string;summary:string;source:string;timestamp:string}>;risk_movements:Array<{case_id:string;score:number;risk_band:string;score_delta?:number;calculated_at:string}>;risk_factor_summary:Array<{name:string;contribution:number;max_contribution:number;evidence_count:number}>;provider_state:Record<string,unknown>;generated_at:string};
+export type DashboardIntelligence={status:string;critical_cases:number;active_watches:number;vasp_leads:number;high_confidence_vasp_leads:number;cross_chain_cases:number;unresolved_cross_chain_cases:number;related_case_clusters:number;open_alerts:number;critical_alerts:number;threat_intel_match_cases:number;p1_recommendations:number;latest_high_priority_recommendation?:Record<string,unknown>|null;priority_cases:PriorityCase[];recent_intelligence_events:Array<{case_id:string;event_type:string;summary:string;source:string;timestamp:string}>;risk_movements:Array<{case_id:string;score:number;risk_band:string;score_delta?:number;calculated_at:string}>;risk_factor_summary:Array<{name:string;contribution:number;max_contribution:number;evidence_count:number}>;provider_state:Record<string,unknown>;generated_at:string};
 export type CaseSummarySnapshot={case_id:string;status:string;workflow_stage:string;wallets:number;transactions:number;graph_nodes:number;graph_edges:number;patterns:number;alerts:number;evidence:number;realtime_events:number;active_watches:number;vasp_exposure?:{count:number;nearest?:{entity:string;entity_id:string;hop_distance:number;confidence:string;address:string;path?:string[]};source?:string};risk?:RiskAssessment;generated_at:string};
-export type CaseIntelligenceSnapshot={case:Case;trace_summary:Record<string,unknown>;risk?:RiskAssessment|null;risk_delta?:RiskDelta|null;top_risk_factors:RiskFactor[];top_patterns:Pattern[];nearest_vasp?:Record<string,unknown>|null;cross_chain_summary:Record<string,unknown>;related_cases_summary:{count:number;links:CaseLink[]};watch_state:Record<string,unknown>;latest_activity?:TimelineEvent|null;latest_alert?:RealtimeAlert|null;intervention_priority?:InterventionPriority|null;threat_intelligence:Record<string,unknown>;recommended_actions:Array<{priority:number;title:string;reason:string;references:string[];target?:string}>;generated_at:string};
+export type CaseIntelligenceSnapshot={case:Case;trace_summary:Record<string,unknown>;risk?:RiskAssessment|null;risk_delta?:RiskDelta|null;top_risk_factors:RiskFactor[];top_patterns:Pattern[];nearest_vasp?:Record<string,unknown>|null;cross_chain_summary:Record<string,unknown>;related_cases_summary:{count:number;links:CaseLink[]};watch_state:Record<string,unknown>;latest_activity?:TimelineEvent|null;latest_alert?:RealtimeAlert|null;intervention_priority?:InterventionPriority|null;threat_intelligence:Record<string,unknown>;recommended_actions:Array<{priority:number|string;title:string;reason:string;references:string[];target?:string}>;generated_at:string};
 export type InterventionPriority={level:string;score:number;reasons:string[];inputs:Record<string,unknown>;formula_version:string;calculated_at:string};
-export type VaspActionPackage={package_id:string;report_id:string;manifest_id?:string|null;case_id:string;case_reference?:string|null;source_wallet?:string|null;vasp_candidate?:VaspCandidate|null;transaction_hashes:string[];evidence_ids:string[];evidence_manifest_hash?:string|null;limitations:string[];recommended_next_step:string;generated_at:string};
+export type VaspActionPackage={package_id:string;report_id:string;manifest_id?:string|null;case_id:string;case_reference?:string|null;source_wallet?:string|null;vasp_candidate?:VaspCandidate|null;transaction_hashes:string[];evidence_ids:string[];evidence_manifest_hash?:string|null;report_version:string;integrity_hash?:string|null;fund_flow:Record<string,unknown>;evidence:Record<string,unknown>;integrity:Record<string,unknown>;investigator_context:Record<string,unknown>;limitations:string[];recommended_next_step:string;generated_at:string};
 export type RiskRegistryResponse={status:string;query:string;entries:RiskRegistryEntry[];generated_at:string};
 export type OperationalStage={stage:string;status:string;started_at?:string;completed_at?:string;duration_ms?:number;records_produced:number;provider?:string;mode?:string;error?:string;evidence_ids:string[]};
 export type InvestigationOperationalState={case:Case;summary:CaseSummarySnapshot;stages:OperationalStage[];workflow_events:WorkflowEvent[];transactions:CaseTransaction[];entities:EntityRecord[];attributions:unknown[];patterns:Pattern[];risk?:RiskAssessment|null;watches:Watch[];alerts:RealtimeAlert[];evidence:EvidenceRecord[];reports:InvestigationReport[];graph_backend:string;generated_at:string};
@@ -59,22 +59,106 @@ export type EvidenceRecord={evidence_id:string;case_id:string;type:string;chain:
 export type EvidenceChainEvent={event_id:string;evidence_id:string;case_id:string;event_type:string;actor_id?:string;occurred_at:string;previous_hash?:string;event_hash:string;metadata:Record<string,unknown>};
 export type EvidenceManifest={manifest_id:string;case_id:string;algorithm:string;content_hash:string;evidence_ids:string[];evidence_count:number;created_at:string;created_by?:string};
 export type EvidenceLedgerEntry={evidence:EvidenceRecord;chain_of_custody:EvidenceChainEvent[];manifest_ids:string[]};
-export type InvestigationReport={report_id:string;case_id:string;report_type:string;trace_id?:string;title:string;content:string;evidence_ids:string[];pattern_ids:string[];assessment_id?:string;content_hash:string;created_at:string;created_by?:string};
+export type InvestigationReport={report_id:string;case_id:string;report_type:string;trace_id?:string;title:string;content:string;evidence_ids:string[];pattern_ids:string[];assessment_id?:string;content_hash:string;created_at:string;created_by?:string;version:string;manifest_id?:string;manifest_hash?:string;sections:Record<string,unknown>};
 export type CaseLink={link_id:string;case_id:string;related_case_id:string;relationship_type:string;shared_wallets:{chain:string;address:string}[];shared_transactions:{chain:string;tx_hash:string}[];confidence_level:string;explanation:string;created_at:string};
 export type CaseFingerprint={case_id:string;wallet_ids:string[];transaction_ids:string[];entity_ids:string[];vasp_ids:string[];bridge_ids:string[];chains:string[];pattern_types:string[];first_activity?:string;last_activity?:string;burst_profile:Record<string,unknown>;wallets:Record<string,unknown>[];vasps:Record<string,unknown>[];bridges:Record<string,unknown>[]};
 export type CaseFusionRelation={related_case_id:string;relationship:string;score:number;shared_wallets:Record<string,unknown>[];shared_transactions:Record<string,unknown>[];shared_vasps:Record<string,unknown>[];shared_bridges:Record<string,unknown>[];shared_patterns:string[];reasons:string[]};
 export type CaseFusionResponse={case_id:string;fingerprint:CaseFingerprint;related_cases:CaseFusionRelation[];limitations:string[]};
 export type CaseFusionCluster={cluster_id:string;case_ids:string[];relationship:string;score:number;shared_infrastructure:string[];reasons:string[]};
 export type CaseFusionClustersResponse={status:string;clusters:CaseFusionCluster[];limitations:string[]};
-export type VaspCandidate={rank:number;entity_id:string;entity_name:string;entity_type:string;address:string;chain:string;hop_distance:number;observed_linked_amount:string;observed_asset:string;attribution_confidence:string;source_quality:string;attribution_source:string;source_version:string;evidence_path:string[];transaction_hashes:string[];evidence_ids:string[];reasons:string[];classification:string};
-export type RiskRegistryEntry={record_type:string;record_id:string;label:string;address?:string;chain?:string;observed_case_count:number;trace_count:number;transaction_count:number;first_observed?:string;last_observed?:string;highest_investigative_risk?:number;highest_investigative_risk_band?:string;current_investigative_risk?:number;current_investigative_risk_band?:string;risk_history_references:string[];observed_patterns:string[];associated_entities:Record<string,unknown>[];observed_roles:string[];related_vasps:string[];associated_bridges:string[];connected_case_ids:string[];threat_intelligence_status:string;evidence_count:number;interpretation:string};
+export type VaspCandidate={rank:number;entity_id:string;entity_name:string;entity_type:string;address:string;chain:string;hop_distance:number;observed_linked_amount:string;observed_asset:string;attribution_confidence:string;source_quality:string;attribution_source:string;source_version:string;source_reference:string;evidence_path:string[];transaction_hashes:string[];evidence_ids:string[];reasons:string[];classification:string};
+export type RiskRegistryEntry={record_type:string;record_id:string;label:string;address?:string;chain?:string;observed_case_count:number;trace_count:number;transaction_count:number;first_observed?:string;last_observed?:string;highest_investigative_risk?:number;highest_investigative_risk_band?:string;current_investigative_risk?:number;current_investigative_risk_band?:string;risk_history_references:string[];observed_patterns:string[];associated_entities:Record<string,unknown>[];observed_roles:string[];related_vasps:string[];associated_bridges:string[];connected_case_ids:string[];threat_intelligence_status:string;external_threat_intelligence:Record<string,unknown>[];evidence_count:number;interpretation:string};
+export type ThreatIntelObservation={observation_id:string;chain:string;address:string;source:string;source_version:string;indicator:string;match_type:'DIRECT_MATCH'|'NO_MATCH'|'NOT_CONFIGURED'|'ERROR';confidence?:number|null;reference?:string|null;retrieved_at:string;raw_status:string;case_id?:string|null;created_at:string};
+export type ThreatIntelResponse={status:string;chain?:string;address?:string;observations:ThreatIntelObservation[];generated_at:string;limitation:string};
+export type Recommendation={recommendation_id:string;case_id:string;priority:'P1'|'P2'|'P3';code:string;title:string;reason:string;evidence_refs:string[];action_target?:string|null;generated_at:string;ruleset_version:string;snapshot_id?:string|null};
+export type RecommendationResponse={status:string;case_id:string;snapshot_id?:string|null;ruleset_version:string;recommendations:Recommendation[];generated_at:string;limitation:string};
 export type ProviderOperationalStatus={provider:string;chains:string[];status:string;capabilities:Capability[];checked_at:string;detail:string};
-export type Watch={watch_id:string;case_id:string;address:string;chain:string;source:string;created_at:string;status:string;provider:string;subscription_id?:string;last_event_at?:string;last_processed_block?:number;last_processed_event?:string;expansion_policy:string;max_hops:number;max_new_nodes_per_event:number;max_new_edges_per_event:number;max_value:number;allowed_assets:string[];error?:string};
+export type Watch={watch_id:string;case_id:string;address:string;chain:string;source:string;created_at:string;status:string;provider:string;subscription_id?:string;last_event_at?:string;last_retrace_at?:string;last_processed_block?:number;last_processed_event?:string;expansion_policy:string;max_hops:number;max_new_nodes_per_event:number;max_new_edges_per_event:number;max_value:number;allowed_assets:string[];error?:string};
 export type TimelineEvent={event_id:string;case_id:string;timestamp:string;event_type:string;summary:string;source:string;evidence_ids:string[];metadata:Record<string,unknown>};
-export type ChangeSet={change_set_id:string;case_id:string;event_id:string;created_at:string;before:Record<string,unknown>;after:Record<string,unknown>;changes:Record<string,unknown>};
+export type ChangeSet={change_set_id:string;case_id:string;event_id:string;trigger_event_id?:string;created_at:string;before:Record<string,unknown>;after:Record<string,unknown>;changes:Record<string,unknown>;new_transactions?:string[];new_wallets?:string[];new_edges?:string[];new_patterns?:string[];risk_before?:Record<string,unknown>;risk_after?:Record<string,unknown>;risk_delta?:number;new_recommendations?:Record<string,unknown>[];alerts_generated?:string[];processed_at?:string};
 export type RealtimeAlert={alert_id:string;case_id:string;subject_id:string;alert_type:string;title:string;explanation:string;severity:string;status:string;risk_delta:number;pattern_ids:string[];evidence_ids:string[];created_at:string};
 export type AlertReview={review_id:string;alert_id:string;case_id:string;from_status:string;to_status:string;action:string;note?:string;actor_id?:string;created_at:string};
 export type ChainCapability={chain_id:string;name:string;family:string;native_asset:string;address_format:string;explorer_base_url:string;block_time_seconds:number;finality_model:string;provider:string;historical_capability:string;realtime_capability:string;token_transfer_capability:string;bridge_detection_capability:string;note?:string};
 export type CrossChainSummary={chains:string[];cross_chain_movements:number;bridge_interactions:number;new_wallets:number;unresolved_links:number;strong_or_exact_links:number;status:string};
 export type CrossChainLink={link_id:string;source:{chain:string;address:string};destination?:{chain:string;address:string};source_transaction_hash:string;destination_transaction_hash:string;bridge_id:string;correlation_id:string;correlation_level:string;confidence_score:number;confidence_band:string;evidence_count:number;correlation_reasons:string[];evidence_ids:string[];provenance_source:string;explanation:string;observed_or_inferred:string;created_at:string};
 export type CrossChainTrace={trace_id:string;case_id:string;root:{chain:string;address:string};chains_visited:string[];cross_chain_hops:number;cross_chain_links:CrossChainLink[];cross_chain_transfers?:{source_chain:string;destination_chain:string;source_tx:string;destination_tx:string;bridge_protocol:string;asset:string;amount:string;timestamp?:string;confidence:string;evidence_ids:string[];correlation_id:string;observed_or_inferred:string}[];primary_path?:{status:string;node_ids:string[];edge_ids:string[];chain_labels:string[];terminal_address?:string|null;terminal_entity_id?:string|null;terminal_entity_name:string;terminal_entity_type:string;attribution:string;hops:number;why:string;evidence_ids:string[];transaction_hashes:string[]}|null;nodes:{node_id:string;chain:string;address:string;node_type:string}[];edges:{edge_id:string;edge_type:string;source_node:string;destination_node:string;chain?:string;destination_chain?:string;transaction_hash?:string;destination_transaction_hash?:string;bridge_id?:string;link_id?:string;confidence_band?:string;observed_or_inferred:string;metadata:Record<string,unknown>}[];status:string;limitations:string[];provider_states:Capability[]};
+
+export type WorkflowStageStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+
+export type WorkflowStageDetail = {
+  stage: string;
+  status: WorkflowStageStatus;
+  started_at?: string;
+  completed_at?: string;
+  error?: string;
+  evidence_references?: string[];
+  output_summary?: Record<string, any>;
+};
+
+export type VaspActionabilityCandidate = {
+  vasp_name: string;
+  entity_id?: string;
+  deposit_address?: string;
+  score: number;
+  confidence: string;
+  hop_count?: number;
+  hop_distance?: number;
+  linked_amount?: number;
+  victim_linked_amount?: number;
+  attribution_source?: string;
+  evidence_path?: string[];
+  transaction_hashes?: string[];
+  provenance?: 'OBSERVED' | 'INFERRED' | 'ATTRIBUTED';
+  provenance_label?: 'OBSERVED' | 'INFERRED' | 'ATTRIBUTED';
+  reason_for_ranking?: string;
+  score_breakdown?: Record<string, any>;
+};
+
+export type VaspActionPackageInfo = {
+  case_reference: string;
+  source_wallet: string;
+  probable_vasp: string;
+  transaction_path?: string[];
+  transaction_hashes?: string[];
+  linked_value: number;
+  confidence: string;
+  evidence_ids?: string[];
+  provenance?: string;
+  limitations?: string[];
+  recommended_investigator_action?: string;
+};
+
+export type InvestigatorRecommendationItem = {
+  recommendation_id: string;
+  recommendation?: string;
+  title?: string;
+  action_item?: string;
+  priority: string;
+  reason?: string;
+  rationale?: string;
+  evidence_ids?: string[];
+  evidence_references?: string[];
+  case_id?: string;
+  created_at?: string;
+};
+
+export type InvestigationWorkflowState = {
+  case_id: string;
+  current_stage: string;
+  status: WorkflowStageStatus;
+  started_at: string;
+  completed_at?: string;
+  error?: string;
+  stages: WorkflowStageDetail[];
+  vasp_candidates?: VaspActionabilityCandidate[];
+  vasp_action_package?: VaspActionPackageInfo | null;
+  recommendations?: InvestigatorRecommendationItem[];
+};
+
+export type InvestigationRunResponse = {
+  case_id: string;
+  status: string;
+  message: string;
+  workflow: InvestigationWorkflowState;
+};
+

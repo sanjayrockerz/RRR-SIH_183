@@ -1,0 +1,26 @@
+{
+  "fixture": "RRR-DEMO-REALTIME-001",
+  "data_origin": "DEVELOPMENT_FIXTURE",
+  "case_id": "9e12f8ae-a161-4274-9104-1bf06dd80723",
+  "initial_hybrid": "P2",
+  "final_hybrid": "P1",
+  "alert_id": "13d4deb9-334d-43a7-a553-0aa4e8260830",
+  "event_id": "RRR-DEMO-REALTIME-001-EVENT-001",
+  "transaction_id": "b7cddb08-7030-56fd-8c60-0dd7e73f64f8",
+  "graph_edge_id": "7efdc69e-eed6-576d-8cb5-f4b068923894",
+  "evidence_id": "9b0d3c0d-4c3f-5f73-8c78-f44fd3fe23d5",
+  "first_replay_duplicate": false,
+  "second_replay_duplicate": true,
+  "counts_after_event": {
+    "transactions": 1,
+    "alerts": 1,
+    "hybrid_snapshots": 3
+  },
+  "counts_after_duplicate": {
+    "transactions": 1,
+    "alerts": 1,
+    "hybrid_snapshots": 3
+  },
+  "p2_to_p1": true,
+  "idempotent": true
+}

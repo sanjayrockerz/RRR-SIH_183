@@ -1,8 +1,25 @@
-# Deployment Guide — Vercel (Frontend) + Railway (Backend)
+# Deployment Guide — Vercel (Frontend) + Render (FastAPI) + Supabase (PostgreSQL)
 
 This guide walks through deploying the Crypto Fraud Intelligence platform:
 - **Frontend** (React/Vite SPA) → **Vercel**
-- **Backend** (FastAPI + PostgreSQL + Neo4j) → **Railway**
+- **Backend** (FastAPI) → **Render**
+- **Database** (PostgreSQL) → **Supabase**
+
+## Required deployment order
+
+1. Provision a Supabase PostgreSQL project and copy its pooled `DATABASE_URL`.
+2. Set `DATABASE_URL` in Render; do not use a localhost URL.
+3. Apply migrations from `infrastructure/postgres` in lexical order, or enable `DATABASE_AUTO_MIGRATE=true` and verify `/api/v1/system/status` reports `migration_state=CURRENT`.
+4. Configure backend environment: `ENVIRONMENT=production`, `FRONTEND_ORIGIN=https://crypto-fraud-intelligence-self.vercel.app`, `JWT_SECRET` or `AUTH_JWT_PUBLIC_KEY`, frozen ML paths, and `BLOCKCHAIN_DATA_MODE=LIVE`.
+5. Deploy the Render service using `render.yaml` / `apps/api/Dockerfile`.
+6. Verify `/health`.
+7. Verify `/ready` returns HTTP 200 with `status=READY`.
+8. Verify `/api/v1/system/status` has explicit component states and no secret values.
+9. Set Vercel `VITE_API_BASE_URL` to the Render service URL.
+10. Redeploy the frontend.
+11. Run `python scripts/production_smoke.py https://<render-service>` and retain `artifacts/production_smoke_report.json`.
+
+The repository does not claim a deployed proof until the smoke script has been run against the real Render + Supabase URLs.
 
 ---
 
@@ -54,6 +71,9 @@ In your Railway service → **Variables** tab, add:
 | `BLOCKCHAIN_DATA_MODE` | `LIVE` |
 | `DATABASE_AUTO_MIGRATE` | `true` |
 | `AUTH_REQUIRED` | `false` |
+| `DEMO_MODE` | `true` for the simulated SAHYOG gateway |
+| `RRR_DEMO_USER` | `RRR@SIH` |
+| `RRR_DEMO_PASSWORD` | `SIH@2026` |
 | `TRACE_DEFAULT_HOPS` | `2` |
 | `TRACE_DEFAULT_MAX_NODES` | `100` |
 | `NEO4J_URI` | *(see Step 3 — add after Neo4j Aura setup)* |

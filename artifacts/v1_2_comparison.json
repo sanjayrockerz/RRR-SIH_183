@@ -1,0 +1,305 @@
+{
+  "best_formulation": "AGGREGATED_HISTORY",
+  "materially_improves_over_v1_1": false,
+  "variants": {
+    "TEMPORAL": {
+      "rows": {
+        "train": 197220,
+        "validation": 39051,
+        "test": 55148
+      },
+      "class_distribution": {
+        "train": {
+          "licit": 187447,
+          "illicit": 9773,
+          "illicit_prevalence": 0.04955379778927087
+        },
+        "validation": {
+          "licit": 36655,
+          "illicit": 2396,
+          "illicit_prevalence": 0.061355663107218766
+        },
+        "test": {
+          "licit": 52597,
+          "illicit": 2551,
+          "illicit_prevalence": 0.04625734387466454
+        }
+      },
+      "selected_scale_pos_weight": 10.0,
+      "best_hyperparameters": {
+        "max_depth": 8,
+        "min_child_weight": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.85,
+        "colsample_bytree": 0.85,
+        "gamma": 0.5,
+        "max_delta_step": 1,
+        "n_estimators": 600
+      },
+      "validation": {
+        "accuracy": 0.96294589127039,
+        "roc_auc": 0.8954345315670709,
+        "pr_auc": 0.6870976704268525,
+        "illicit_precision": 0.7032119914346895,
+        "illicit_recall": 0.6853088480801336,
+        "illicit_f1": 0.6941450010568591,
+        "macro_f1": 0.8372116563256791,
+        "confusion_matrix": [
+          [
+            35962,
+            693
+          ],
+          [
+            754,
+            1642
+          ]
+        ]
+      },
+      "test": {
+        "accuracy": 0.9486291433959527,
+        "roc_auc": 0.7200988497502444,
+        "pr_auc": 0.24892707454505045,
+        "illicit_precision": 0.3880952380952381,
+        "illicit_recall": 0.19168953351626813,
+        "illicit_f1": 0.2566255575964314,
+        "macro_f1": 0.6150104357452035,
+        "confusion_matrix": [
+          [
+            51826,
+            771
+          ],
+          [
+            2062,
+            489
+          ]
+        ]
+      },
+      "operating_points": {
+        "MAX_F1": {
+          "threshold": 0.8,
+          "precision": 0.7032119914346895,
+          "recall": 0.6853088480801336,
+          "f1": 0.6941450010568591,
+          "false_positives": 693.0,
+          "false_negatives": 754.0
+        },
+        "RECALL_70": {
+          "threshold": 0.72,
+          "precision": 0.6137527432333577,
+          "recall": 0.7003338898163606,
+          "f1": 0.6541910331384015,
+          "false_positives": 1056.0,
+          "false_negatives": 718.0
+        },
+        "PRECISION_50": {
+          "threshold": 0.66,
+          "precision": 0.5273509526736324,
+          "recall": 0.7161936560934892,
+          "f1": 0.607433628318584,
+          "false_positives": 1538.0,
+          "false_negatives": 680.0
+        }
+      }
+    },
+    "LATEST_OBSERVATION": {
+      "rows": {
+        "train": 170404,
+        "validation": 38514,
+        "test": 56436
+      },
+      "class_distribution": {
+        "train": {
+          "licit": 161076,
+          "illicit": 9328,
+          "illicit_prevalence": 0.05474049904931809
+        },
+        "validation": {
+          "licit": 36124,
+          "illicit": 2390,
+          "illicit_prevalence": 0.06205535649374253
+        },
+        "test": {
+          "licit": 53888,
+          "illicit": 2548,
+          "illicit_prevalence": 0.045148486781486995
+        }
+      },
+      "selected_scale_pos_weight": 17.268010291595196,
+      "best_hyperparameters": {
+        "max_depth": 8,
+        "min_child_weight": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.85,
+        "colsample_bytree": 0.85,
+        "gamma": 0.5,
+        "max_delta_step": 1,
+        "n_estimators": 600
+      },
+      "validation": {
+        "accuracy": 0.955288985823337,
+        "roc_auc": 0.8935580501656545,
+        "pr_auc": 0.6901217167879529,
+        "illicit_precision": 0.6254695717505635,
+        "illicit_recall": 0.696652719665272,
+        "illicit_f1": 0.6591448931116389,
+        "macro_f1": 0.8176101257822282,
+        "confusion_matrix": [
+          [
+            35127,
+            997
+          ],
+          [
+            725,
+            1665
+          ]
+        ]
+      },
+      "test": {
+        "accuracy": 0.9426429938337232,
+        "roc_auc": 0.7165459511989749,
+        "pr_auc": 0.2473550434406753,
+        "illicit_precision": 0.2995927865037813,
+        "illicit_recall": 0.2021193092621664,
+        "illicit_f1": 0.24138739161003048,
+        "macro_f1": 0.6057910670126023,
+        "confusion_matrix": [
+          [
+            52684,
+            1204
+          ],
+          [
+            2033,
+            515
+          ]
+        ]
+      },
+      "operating_points": {
+        "MAX_F1": {
+          "threshold": 0.8,
+          "precision": 0.6254695717505635,
+          "recall": 0.696652719665272,
+          "f1": 0.6591448931116389,
+          "false_positives": 997.0,
+          "false_negatives": 725.0
+        },
+        "RECALL_70": {
+          "threshold": 0.79,
+          "precision": 0.5930521091811415,
+          "recall": 0.7,
+          "f1": 0.6421032431395126,
+          "false_positives": 1148.0,
+          "false_negatives": 717.0
+        },
+        "PRECISION_50": {
+          "threshold": 0.76,
+          "precision": 0.5306376360808709,
+          "recall": 0.7138075313807531,
+          "f1": 0.608742194469224,
+          "false_positives": 1509.0,
+          "false_negatives": 684.0
+        }
+      }
+    },
+    "AGGREGATED_HISTORY": {
+      "rows": {
+        "train": 170404,
+        "validation": 38514,
+        "test": 56436
+      },
+      "class_distribution": {
+        "train": {
+          "licit": 161076,
+          "illicit": 9328,
+          "illicit_prevalence": 0.05474049904931809
+        },
+        "validation": {
+          "licit": 36124,
+          "illicit": 2390,
+          "illicit_prevalence": 0.06205535649374253
+        },
+        "test": {
+          "licit": 53888,
+          "illicit": 2548,
+          "illicit_prevalence": 0.045148486781486995
+        }
+      },
+      "selected_scale_pos_weight": 15.0,
+      "best_hyperparameters": {
+        "max_depth": 8,
+        "min_child_weight": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.85,
+        "colsample_bytree": 0.85,
+        "gamma": 0.5,
+        "max_delta_step": 1,
+        "n_estimators": 600
+      },
+      "validation": {
+        "accuracy": 0.9620397777431583,
+        "roc_auc": 0.8940421683286162,
+        "pr_auc": 0.69366471659699,
+        "illicit_precision": 0.6974468085106383,
+        "illicit_recall": 0.6857740585774058,
+        "illicit_f1": 0.6915611814345991,
+        "macro_f1": 0.8356682622533775,
+        "confusion_matrix": [
+          [
+            35413,
+            711
+          ],
+          [
+            751,
+            1639
+          ]
+        ]
+      },
+      "test": {
+        "accuracy": 0.9498547026720533,
+        "roc_auc": 0.7128490610911824,
+        "pr_auc": 0.24332584679331126,
+        "illicit_precision": 0.388801261829653,
+        "illicit_recall": 0.1934850863422292,
+        "illicit_f1": 0.2583857442348008,
+        "macro_f1": 0.6162178867887619,
+        "confusion_matrix": [
+          [
+            53113,
+            775
+          ],
+          [
+            2055,
+            493
+          ]
+        ]
+      },
+      "operating_points": {
+        "MAX_F1": {
+          "threshold": 0.8,
+          "precision": 0.6974468085106383,
+          "recall": 0.6857740585774058,
+          "f1": 0.6915611814345991,
+          "false_positives": 711.0,
+          "false_negatives": 751.0
+        },
+        "RECALL_70": {
+          "threshold": 0.77,
+          "precision": 0.5829565217391305,
+          "recall": 0.701255230125523,
+          "f1": 0.6366571699905034,
+          "false_positives": 1199.0,
+          "false_negatives": 714.0
+        },
+        "PRECISION_50": {
+          "threshold": 0.74,
+          "precision": 0.5334375,
+          "recall": 0.7142259414225941,
+          "f1": 0.6107334525939178,
+          "false_positives": 1493.0,
+          "false_negatives": 683.0
+        }
+      }
+    }
+  },
+  "distribution_shift_artifact": "artifacts/v1_2_distribution_shift.json",
+  "note": "No prior V1/V1.1 dataset or model was overwritten."
+}

@@ -3,7 +3,7 @@ import { api, caseIntelligence } from '../api';
 import type { Case, CaseIntelligenceSnapshot, InvestigationOperationalState, OperationalStage } from '../types';
 
 const short = (value?: string) => value && value.length > 18 ? `${value.slice(0, 8)}...${value.slice(-6)}` : (value || 'Unavailable');
-const stageLabel = (value: string) => value.replaceAll('_', ' ');
+const stageLabel = (value?: string) => (value || '').replaceAll('_', ' ');
 
 export function CaseCommandCenter({
   caseData,
@@ -51,13 +51,47 @@ export function CaseCommandCenter({
     }
   };
 
+  const workflowSteps = [
+    { id: 'case', label: '1. Case', route: 'cases' },
+    { id: 'trace', label: '2. Trace', route: 'graph' },
+    { id: 'risk', label: '3. Risk', route: 'risk' },
+    { id: 'cross-chain', label: '4. Cross-chain', route: 'cross-chain' },
+    { id: 'vasp', label: '5. VASP', route: 'vasp-intelligence' },
+    { id: 'fusion', label: '6. Case Fusion', route: 'case-fusion' },
+    { id: 'watch', label: '7. Watch', route: 'realtime' },
+    { id: 'realtime', label: '8. Realtime Event', route: 'realtime' },
+    { id: 'alert', label: '9. Alert', route: 'realtime' },
+    { id: 'recommendation', label: '10. Recommendation', route: 'vasp-intelligence' },
+    { id: 'evidence', label: '11. Evidence', route: 'evidence' },
+    { id: 'report', label: '12. Report', route: 'reports' },
+  ];
+
   return (
     <div className="case-command-overview">
+      <div className="command-stepper-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '12px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: '8px', marginBottom: '20px' }}>
+        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <span style={{ fontSize: '11px', letterSpacing: '1px', color: '#64748b', fontWeight: 700 }}>INVESTIGATION COMMAND CENTER FLOW</span>
+          <span style={{ fontSize: '11px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(96, 165, 250, 0.3)' }}>
+            DATA MODE: SIMULATED / OFFLINE RESILIENT
+          </span>
+        </div>
+        {workflowSteps.map((step, idx) => (
+          <button
+            key={step.id}
+            onClick={() => onNavigate(step.route)}
+            className="secondary"
+            style={{ fontSize: '12px', padding: '4px 10px', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(255, 255, 255, 0.15)', color: '#e2e8f0', cursor: 'pointer' }}
+          >
+            {step.label}
+          </button>
+        ))}
+      </div>
+
       <section className="command-panel" style={{ marginBottom: '20px' }} aria-label="Case intelligence snapshot">
         <div className="panel-title"><div><span className="eyebrow">CASE INTELLIGENCE SNAPSHOT</span><h3>Investigative posture</h3></div><button className="secondary" onClick={() => onNavigate('vasp-intelligence')}>VASP ACTIONABILITY</button></div>
-        {snapshotError ? <p className="empty-copy" role="status">{snapshotError}</p> : snapshot ? <div className="case-operation-grid"><Metric label="RISK POSTURE" value={snapshot.risk ? `${snapshot.risk.band} ${snapshot.risk.score}` : 'NO DATA'} detail={snapshot.risk_delta ? `Δ ${snapshot.risk_delta.delta >= 0 ? '+' : ''}${snapshot.risk_delta.delta}` : 'No prior assessment'} /><Metric label="CROSS-CHAIN" value={String(snapshot.cross_chain_summary.status || 'NO DATA')} detail={`${snapshot.cross_chain_summary.cross_chain_movements || 0} persisted link(s)`} /><Metric label="CASE FUSION" value={snapshot.related_cases_summary.count} detail="Exact persisted overlap(s)" /><Metric label="WATCH" value={snapshot.watch_state.active ? 'ACTIVE' : 'NOT CONFIGURED'} detail={`${snapshot.watch_state.count || 0} target(s)`} /></div> : <p className="empty-copy">Loading persisted case intelligence…</p>}
-        {snapshot?.recommended_actions.length ? <div className="factor-stack" style={{ marginTop: '15px' }}>{snapshot.recommended_actions.map(action => <div className="factor-line" key={`${action.priority}:${action.title}`}><span><b>PRIORITY {action.priority}</b> {action.title}</span><small>{action.reason}</small></div>)}</div> : snapshot && <p className="empty-copy">NO RECOMMENDATIONS — no qualifying persisted signal is available.</p>}
-        {snapshot?.intervention_priority && <div className="factor-stack" style={{ marginTop: '15px' }}><div className="factor-line"><span><b>INTERVENTION PRIORITY {snapshot.intervention_priority.level}</b> · {snapshot.intervention_priority.score}/100</span><small>{snapshot.intervention_priority.reasons.join(' · ')}</small></div></div>}
+        {snapshotError ? <p className="empty-copy" role="status">{snapshotError}</p> : snapshot ? <div className="case-operation-grid"><Metric label="RISK POSTURE" value={snapshot.risk ? `${snapshot.risk.band} ${snapshot.risk.score}` : 'NO DATA'} detail={snapshot.risk_delta ? `Δ ${snapshot.risk_delta.delta >= 0 ? '+' : ''}${snapshot.risk_delta.delta}` : 'No prior assessment'} /><Metric label="CROSS-CHAIN" value={String(snapshot.cross_chain_summary?.status || 'NO DATA')} detail={`${snapshot.cross_chain_summary?.cross_chain_movements || 0} persisted link(s)`} /><Metric label="CASE FUSION" value={snapshot.related_cases_summary?.count ?? 0} detail="Exact persisted overlap(s)" /><Metric label="WATCH" value={snapshot.watch_state?.active ? 'ACTIVE' : 'NOT CONFIGURED'} detail={`${snapshot.watch_state?.count || 0} target(s)`} /></div> : <p className="empty-copy">Loading persisted case intelligence…</p>}
+        {snapshot?.recommended_actions?.length ? <div className="factor-stack" style={{ marginTop: '15px' }}>{snapshot.recommended_actions.map(action => <div className="factor-line" key={`${action.priority}:${action.title}`}><span><b>PRIORITY {action.priority}</b> {action.title}</span><small>{action.reason}</small></div>)}</div> : snapshot && <p className="empty-copy">NO RECOMMENDATIONS — no qualifying persisted signal is available.</p>}
+        {snapshot?.intervention_priority && <div className="factor-stack" style={{ marginTop: '15px' }}><div className="factor-line"><span><b>INTERVENTION PRIORITY {snapshot.intervention_priority.level}</b> · {snapshot.intervention_priority.score}/100</span><small>{(snapshot.intervention_priority.reasons || []).join(' · ')}</small></div></div>}
         {snapshot?.threat_intelligence && <div className="factor-line" style={{ marginTop: '10px' }}><span><b>THREAT CONTEXT</b> {String(snapshot.threat_intelligence.status || 'NOT_CONFIGURED')}</span><small>Source-backed screening results remain separate from on-chain facts and risk.</small></div>}
       </section>
       <div className="case-operation-grid" style={{ marginBottom: '20px' }}>
@@ -65,7 +99,7 @@ export function CaseCommandCenter({
         <Metric label="TRANSACTIONS" value={summary?.transactions ?? 0} detail={`${trace?.mode || 'NO TRACE'} | ${trace?.provider || 'Provider unavailable'}`} />
         <Metric label="GRAPH" value={summary?.graph_edges ?? 0} detail={`${summary?.graph_nodes ?? 0} nodes | ${state?.graph_backend || 'PostgreSQL'}`} />
         <Metric label="VASP EXPOSURE" value={summary?.vasp_exposure?.count ?? 0} detail={vasp ? `${vasp.entity} | ${vasp.hop_distance} hops` : 'No source-backed match'} />
-        <Metric label="PATTERNS" value={summary?.patterns ?? 0} detail={`${state?.patterns.filter(item => ['HIGH', 'CRITICAL'].includes(item.severity)).length || 0} high/critical`} />
+        <Metric label="PATTERNS" value={summary?.patterns ?? 0} detail={`${(state?.patterns || []).filter(item => ['HIGH', 'CRITICAL'].includes(item.severity)).length} high/critical`} />
         <Metric label="EVIDENCE" value={summary?.evidence ?? 0} detail={`${summary?.alerts ?? 0} alerts | ${summary?.active_watches ?? 0} watches`} />
       </div>
 
@@ -174,7 +208,7 @@ function Metric({ label, value, detail }: { label: string; value: number | strin
 
 function StageRow({ stage, onClick }: { stage: OperationalStage; onClick: () => void }) {
   return (
-    <div className={`pipeline-row ${stage.status.toLowerCase()}`} style={{ cursor: 'pointer' }} onClick={onClick}>
+    <div className={`pipeline-row ${(stage?.status || 'pending').toLowerCase()}`} style={{ cursor: 'pointer' }} onClick={onClick}>
       <i />
       <div>
         <b>{stageLabel(stage.stage)}</b>

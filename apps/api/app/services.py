@@ -85,12 +85,27 @@ class CaseRepository:
     async def persist_report(self, report: InvestigationReport) -> InvestigationReport: raise NotImplementedError
     async def list_reports(self, case_id: str) -> list[InvestigationReport]: raise NotImplementedError
     async def get_report(self, case_id: str, report_id: str) -> InvestigationReport | None: raise NotImplementedError
+    async def persist_vasp_action_package(self, package: VaspActionPackage): raise NotImplementedError
+    async def list_vasp_action_packages(self, case_id: str) -> list[VaspActionPackage]: raise NotImplementedError
+    async def get_latest_vasp_action_package(self, case_id: str) -> VaspActionPackage | None: raise NotImplementedError
     async def related_cases(self, case_id: str) -> list[CaseLink]: raise NotImplementedError
     async def case_fusion_fingerprints(self, case_id: str | None = None) -> list[CaseFingerprint]: raise NotImplementedError
     async def risk_registry_wallet(self, chain: Chain, address: str) -> RiskRegistryEntry | None: raise NotImplementedError
     async def intelligence_sources(self) -> list[IntelligenceSource]: raise NotImplementedError
     async def threat_indicators(self, chain: Chain | None = None) -> list[ThreatIndicator]: raise NotImplementedError
     async def contract_security_findings(self, chain: Chain, address: str) -> list[ContractSecurityFinding]: raise NotImplementedError
+    async def save_workflow_state(self, case_id: str, state: InvestigationWorkflowState) -> InvestigationWorkflowState: raise NotImplementedError
+    async def get_workflow_state(self, case_id: str) -> InvestigationWorkflowState | None: raise NotImplementedError
+    async def update_workflow_stage(self, case_id: str, stage: str, stage_detail: WorkflowStageDetail) -> InvestigationWorkflowState: raise NotImplementedError
+    async def persist_threat_intel(self, observation): raise NotImplementedError
+    async def threat_intel_observations(self, chain: Chain | None = None, address: str | None = None, case_id: str | None = None): raise NotImplementedError
+    async def persist_recommendations(self, recommendations): raise NotImplementedError
+    async def latest_recommendations(self, case_id: str): raise NotImplementedError
+    async def persist_ml_inference(self, record): raise NotImplementedError
+    async def ml_inferences(self, case_id: str | None = None, chain: str | None = None, address: str | None = None, limit: int = 50): raise NotImplementedError
+    async def persist_hybrid_snapshot(self, intelligence): raise NotImplementedError
+    async def get_latest_hybrid_snapshot(self, case_id: str): raise NotImplementedError
+    async def list_hybrid_snapshots(self, case_id: str, limit: int = 50): raise NotImplementedError
 
 class TraceService:
     def __init__(self,provider:BlockchainProvider, provider_registry=None):

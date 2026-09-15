@@ -1,0 +1,23 @@
+{
+  "captured_at": "2026-09-11",
+  "commands": {
+    "requested_backend_from_repository_root": ".venv\\Scripts\\python.exe -m pytest apps/api/tests -q",
+    "backend_reproducible_working_directory": "apps/api: ..\\..\\.venv\\Scripts\\python.exe -m pytest tests -q",
+    "frontend_tests": "npm test -- --run",
+    "frontend_build": "npm run build"
+  },
+  "backend": {
+    "root_invocation": {"passed": 0, "failed": 0, "errors": 13, "skipped": 0, "reason": "pytest collection could not import app because the repository root was not on the Python import path"},
+    "working_directory_invocation": {"passed": 126, "failed": 5, "errors": 11, "skipped": 3},
+    "failures": [
+      {"test": "tests/test_phase3_operational_command_center.py::test_standardized_21_field_report", "classification": "TEST_CONTRACT_MISMATCH", "reason": "test asserts the retired 21-field report headings while ReportService emits the current evidence-backed report contract"},
+      {"test": "tests/test_runtime_open_case.py::test_system_status_reachable", "classification": "EXTERNAL_RUNTIME_DEPENDENCY", "reason": "httpx.Client targets localhost:8000 and no external API process was running"},
+      {"test": "tests/test_runtime_open_case.py::test_system_dependencies", "classification": "EXTERNAL_RUNTIME_DEPENDENCY", "reason": "httpx.Client targets localhost:8000 and no external API process was running"},
+      {"test": "tests/test_runtime_open_case.py::test_list_cases", "classification": "EXTERNAL_RUNTIME_DEPENDENCY", "reason": "httpx.Client targets localhost:8000 and no external API process was running"},
+      {"test": "tests/test_runtime_open_case.py::test_cors_allows_frontend_origin", "classification": "EXTERNAL_RUNTIME_DEPENDENCY", "reason": "httpx.Client targets localhost:8000 and no external API process was running"}
+    ],
+    "errors": {"test_module": "tests/test_runtime_open_case.py", "count": 11, "reason": "shared seeded_case fixture could not POST /api/v1/dev/seed-case because localhost:8000 refused the connection"}
+  },
+  "frontend": {"tests": {"passed": 1, "failed": 0}, "build": "passed"},
+  "warnings": ["pytest-asyncio asyncio_default_fixture_loop_scope is unset", "reportlab ast.NameConstant deprecation"]
+}

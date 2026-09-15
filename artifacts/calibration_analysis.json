@@ -1,0 +1,7 @@
+{
+  "method": "sigmoid",
+  "holdout": "validation second half",
+  "raw_pr_auc": 0.6890094603049788,
+  "calibrated_pr_auc": 0.6890094603049788,
+  "used_for_final": false
+}

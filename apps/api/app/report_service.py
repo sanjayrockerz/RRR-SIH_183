@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from .domain import AuditEvent, InvestigationReport, ReportCreateRequest, ReportType, TimelineEvent
+from .domain import AuditEvent, EvidenceManifestRequest, InvestigationReport, ReportCreateRequest, ReportType, TimelineEvent
 
 
 class ReportService:
@@ -26,6 +26,22 @@ class ReportService:
         risk_history = await self.repository.risk_history(case_id)
         alerts = await self.repository.alerts(case_id)
         cross_links = await self.repository.cross_chain_links(case_id) if hasattr(self.repository, "cross_chain_links") else []
+        threat_intel = []
+        if hasattr(self.repository, "threat_intel_observations"):
+            try:
+                threat_intel = await self.repository.threat_intel_observations(case_id=case_id)
+            except NotImplementedError:
+                threat_intel = []
+        recommendations = None
+        if hasattr(self.repository, "latest_recommendations"):
+            try:
+                recommendations = await self.repository.latest_recommendations(case_id)
+            except NotImplementedError:
+                recommendations = None
+        manifest = None
+        if evidence and hasattr(self.repository, "persist_evidence_manifest"):
+            from .evidence_service import EvidenceService
+            manifest = await EvidenceService(self.repository).create_manifest(case_id, EvidenceManifestRequest(created_by=request.created_by))
         
         from .attribution import AttributionEngine, NearestEntityResolver
         from .synthetic_attribution import is_synthetic_trace, merge as merge_synthetic_attribution
@@ -34,11 +50,41 @@ class ReportService:
             entities, sources, records = merge_synthetic_attribution(entities, sources, records)
         nearest = NearestEntityResolver(AttributionEngine(entities, sources, records)).resolve(trace) if trace else []
 
-        report = self._build(case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links)
+        report = self._build(case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links, threat_intel, recommendations)
+        related = await self.repository.related_cases(case_id) if hasattr(self.repository, "related_cases") else []
+        fusion = await self.repository.case_fusion_fingerprints(case_id) if hasattr(self.repository, "case_fusion_fingerprints") else []
+        sections = self._sections(case, trace, evidence, patterns, assessment, risk_history, cross_links, nearest, threat_intel, recommendations, manifest, screenings, alerts, related, fusion)
+        report = report.model_copy(update={"version": "1.0", "manifest_id": manifest.manifest_id if manifest else None, "manifest_hash": manifest.content_hash if manifest else None, "sections": sections})
         persisted = await self.repository.persist_report(report)
         await self.repository.append_audit_event(AuditEvent(event_id=str(uuid4()), case_id=case_id, action="REPORT_GENERATED", resource_type="REPORT", resource_id=persisted.report_id, actor_id=request.created_by, occurred_at=persisted.created_at, metadata={"report_type": persisted.report_type.value, "evidence_count": len(persisted.evidence_ids)}))
         await self.repository.append_timeline(TimelineEvent(event_id=str(uuid4()), case_id=case_id, timestamp=persisted.created_at, event_type="REPORT_GENERATED", summary="Evidence-backed investigation report snapshot generated.", source="ReportService", evidence_ids=persisted.evidence_ids, metadata={"report_id": persisted.report_id, "report_type": persisted.report_type.value}))
         return persisted
+
+    @staticmethod
+    def _sections(case, trace, evidence, patterns, assessment, risk_history, cross_links, nearest, threat_intel, recommendations, manifest, screenings=None, alerts=None, related=None, fusion=None):
+        ids = sorted({x.evidence_id for x in evidence})
+        provenance = {"evidence_ids": ids, "trace_run_id": trace.trace_id if trace else None, "source": trace.provider if trace else "persisted_case_state"}
+        return {
+            "case_summary": {"case_id": case.case_id, "title": case.title, "status": case.status, "provenance": provenance},
+            "reported_wallet": {"wallets": [x.model_dump(mode="json") for x in case.wallets], "provenance": provenance},
+            "investigation_workflow_state": {"status": case.status, "provenance": provenance},
+            "blockchain_trace_summary": {"metrics": trace.metrics.model_dump(mode="json") if trace else {}, "provenance": provenance},
+            "transaction_fund_flow": {"transaction_hashes": [x.transfer.tx_hash for x in trace.edges] if trace else [], "provenance": provenance},
+            "graph_summary": {"nodes": trace.metrics.node_count if trace else 0, "edges": trace.metrics.edge_count if trace else 0, "provenance": provenance},
+            "pattern_intelligence": {"pattern_observation_ids": [x.pattern_id for x in patterns], "provenance": {**provenance, "source": "PatternEngine"}},
+            "deterministic_risk_assessment": {"assessment_id": assessment.assessment_id if assessment else None, "assessment": assessment.model_dump(mode="json") if assessment else None, "provenance": {**provenance, "source": "RuleBasedRiskEngine"}},
+            "risk_delta_history": {"assessment_ids": [x.assessment_id for x in risk_history], "provenance": provenance},
+            "cross_chain_intelligence": {"links": [x.model_dump(mode="json") for x in cross_links], "provenance": {**provenance, "source": "CrossChainCorrelationEngine"}},
+            "vasp_intelligence": {"candidates": [x.model_dump(mode="json") for x in nearest], "provenance": {**provenance, "source": "EntityAttribution"}},
+            "risk_registry_history": {"provenance": provenance},
+            "case_fusion_related_cases": {"related_cases": [x.model_dump(mode="json") for x in (related or [])], "fingerprints": [x.model_dump(mode="json") for x in (fusion or [])], "provenance": provenance},
+            "threat_intelligence": {"observations": [x.model_dump(mode="json") for x in (threat_intel or [])], "provenance": {**provenance, "source": "ThreatIntelligence"}},
+            "investigator_recommendations": {"recommendations": [x.model_dump(mode="json") for x in (recommendations.recommendations if recommendations else [])], "provenance": provenance},
+            "alerts_watch_activity": {"alerts": [x.model_dump(mode="json") for x in (alerts or [])], "provenance": provenance},
+            "evidence_manifest": {"manifest_id": manifest.manifest_id if manifest else None, "manifest_hash": manifest.content_hash if manifest else None, "evidence_ids": ids, "provenance": {"source": "EvidenceLedger"}},
+            "limitations": ["Attribution, risk, and cross-chain conclusions are source-backed or inferred intelligence requiring review."],
+            "generated": {"version": "1.0", "immutable": True}
+        }
 
     async def list(self, case_id: str) -> list[InvestigationReport]:
         return await self.repository.list_reports(case_id)
@@ -46,7 +92,7 @@ class ReportService:
     async def get(self, case_id: str, report_id: str) -> InvestigationReport | None:
         return await self.repository.get_report(case_id, report_id)
 
-    def _build(self, case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links=None):
+    def _build(self, case, trace, evidence, patterns, assessment, screenings, risk_history, alerts, nearest, request, cross_links=None, threat_intel=None, recommendations=None):
         now = datetime.now(timezone.utc)
         evidence_ids = sorted({item.evidence_id for item in evidence})
         pattern_ids = sorted({item.pattern_id for item in patterns})
@@ -142,6 +188,13 @@ class ReportService:
                 lines.append(f"   - [{idx+1}] Source: {f.source} | Hash: {f.tx_hash} | Detail: {f.metadata.get('description', 'No details available')}")
         else:
             lines.append("   - No security or threat intelligence findings recorded.")
+
+        lines.extend(["", "9A. EXTERNAL THREAT INTELLIGENCE"])
+        if threat_intel:
+            for item in threat_intel:
+                lines.append(f"   - Source: {item.source} | Result: {item.match_type.value} | Confidence: {item.confidence if item.confidence is not None else 'N/A'} | Retrieved: {item.retrieved_at.isoformat()} | Reference: {item.reference or 'N/A'}")
+        else:
+            lines.append("   - No persisted external threat-intelligence observations. NOT CONFIGURED or not refreshed.")
 
         lines.extend([
             "",
@@ -261,6 +314,12 @@ class ReportService:
             "   - INFERRED: Analytical correlation or classification that requires review and should not be presented as fact.",
             "   - NOT CONFIGURED / UNKNOWN: No reliable source result is available; absence of a match is not evidence of absence.",
         ])
+        lines.extend(["", "19A. DETERMINISTIC INVESTIGATOR RECOMMENDATIONS"])
+        if recommendations and recommendations.recommendations:
+            for item in recommendations.recommendations:
+                lines.append(f"   - [{item.priority.value}] {item.title}: {item.reason} | Evidence: {', '.join(item.evidence_refs) or 'none'} | Action: {item.action_target or 'review'}")
+        else:
+            lines.append("   - No persisted recommendation snapshot is available.")
         content = "\n".join(lines)
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
         return InvestigationReport(report_id=str(uuid4()), case_id=case.case_id, report_type=request.report_type, trace_id=trace.trace_id if trace else None, title=f"{request.report_type.value.replace('_', ' ').title()} — {case.title}", content=content, evidence_ids=evidence_ids, pattern_ids=pattern_ids, assessment_id=assessment.assessment_id if assessment else None, content_hash=digest, created_at=now, created_by=request.created_by)

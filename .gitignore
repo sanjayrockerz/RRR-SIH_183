@@ -13,3 +13,6 @@ dist/
 $target/
 tmp/*.log
 tmp/*.pdf
+tmp/dataset_audit.sqlite3
+data/Datasets/wallets_features.csv
+data/Datasets/AddrAddr_edgelist.csv

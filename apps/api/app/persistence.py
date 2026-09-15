@@ -13,23 +13,31 @@ from .cross_chain_persistence import CrossChainPersistenceMixin
 from .cyber_persistence import CyberPersistenceMixin
 from .evidence_persistence import EvidencePersistenceMixin
 from .report_persistence import ReportPersistenceMixin
+from .threat_intel_persistence import ThreatIntelPersistenceMixin
+from .recommendation_persistence import RecommendationPersistenceMixin
+from .vasp_action_persistence import VaspActionPersistenceMixin
+from .ml_persistence import MLPersistenceMixin
+from .hybrid_persistence import HybridPersistenceMixin
 
 class DatabaseError(RuntimeError):
     """Database failures safe to translate at the HTTP boundary."""
 
-class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, CyberPersistenceMixin, CrossChainPersistenceMixin, RealtimePersistenceMixin, RiskPersistenceMixin, CaseRepository):
+class PostgresCaseRepository(HybridPersistenceMixin, MLPersistenceMixin, VaspActionPersistenceMixin, RecommendationPersistenceMixin, ThreatIntelPersistenceMixin, ReportPersistenceMixin, EvidencePersistenceMixin, CyberPersistenceMixin, CrossChainPersistenceMixin, RealtimePersistenceMixin, RiskPersistenceMixin, CaseRepository):
     def __init__(self):
         self.pool: asyncpg.Pool | None = None
         self.status = "UNAVAILABLE"
         self.migration_status = "UNKNOWN"
+        self.latest_migration: str | None = None
+        self.pending_migrations: list[str] = []
+        self.migration_error: str | None = None
         self.last_error: str | None = None
     async def connect(self):
         try:
             self.pool = await asyncpg.create_pool(settings.database_url, min_size=settings.database_min_pool_size, max_size=settings.database_max_pool_size)
             if settings.database_auto_migrate: await self._run_migrations()
-            self.status = "READY"; self.migration_status = "READY"; self.last_error = None
-        except (OSError, asyncpg.PostgresError) as exc:
-            self.status = "UNAVAILABLE"; self.migration_status = "UNKNOWN"; self.last_error = type(exc).__name__
+            self.status = "READY"; self.migration_status = "CURRENT"; self.last_error = None; self.migration_error = None
+        except (OSError, asyncpg.PostgresError, DatabaseError) as exc:
+            self.status = "UNAVAILABLE"; self.migration_status = "FAILED"; self.last_error = type(exc).__name__; self.migration_error = type(exc).__name__
             if self.pool: await self.pool.close(); self.pool = None
             logging.getLogger("crypto_fraud_intelligence").error("database_error",extra={"error_type":type(exc).__name__})
     async def close(self):
@@ -45,12 +53,19 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             raise DatabaseError("PostgreSQL migration directory is unavailable")
         async with pool.acquire() as conn:
             await conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations(version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())")
+            paths = sorted(directory.glob("*.sql"), key=lambda path: path.name)
             applied={row["version"] for row in await conn.fetch("SELECT version FROM schema_migrations")}
-            for path in sorted(directory.glob("*.sql")):
-                if path.name in applied: continue
+            self.pending_migrations = [path.name for path in paths if path.name not in applied]
+            for path in paths:
+                if path.name in applied:
+                    self.latest_migration = path.name
+                    continue
                 async with conn.transaction():
                     await conn.execute(path.read_text(encoding="utf-8"))
-                    await conn.execute("INSERT INTO schema_migrations(version) VALUES($1)",path.name)
+                    await conn.execute("INSERT INTO schema_migrations(version) VALUES($1) ON CONFLICT(version) DO NOTHING",path.name)
+                self.latest_migration = path.name
+            self.pending_migrations = []
+            self.migration_status = "CURRENT"
     def _require_pool(self):
         if not self.pool: raise DatabaseError("Persistent storage is unavailable")
         return self.pool
@@ -184,7 +199,10 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                         SELECT DISTINCT other.case_id FROM case_transactions current JOIN case_transactions other ON other.transaction_id=current.transaction_id WHERE current.case_id<>other.case_id
                       ) overlap_rows) AS related_case_clusters,
                       (SELECT count(*) FROM alerts WHERE status='NEW') AS open_alerts,
-                      (SELECT count(*) FROM alerts WHERE status='NEW' AND severity='CRITICAL') AS critical_alerts
+                      (SELECT count(*) FROM alerts WHERE status='NEW' AND severity='CRITICAL') AS critical_alerts,
+                      (SELECT count(DISTINCT case_id) FROM threat_intel_observations WHERE case_id IS NOT NULL AND match_type='DIRECT_MATCH') AS threat_intel_match_cases,
+                      (SELECT count(*) FROM recommendation_snapshots r WHERE r.priority='P1' AND r.snapshot_id=(SELECT r2.snapshot_id FROM recommendation_snapshots r2 WHERE r2.case_id=r.case_id ORDER BY r2.generated_at DESC LIMIT 1)) AS p1_recommendations,
+                      (SELECT row_to_json(r) FROM (SELECT recommendation_id,case_id,priority,code,title,reason,action_target,generated_at FROM recommendation_snapshots WHERE priority='P1' ORDER BY generated_at DESC LIMIT 1) r) AS latest_high_priority_recommendation
                 """)
                 rows = await conn.fetch("""
                     WITH latest_risk AS (
@@ -259,7 +277,7 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
                 if row["vasp_lead_count"]: reasons.append("source-backed VASP lead")
                 if row["open_critical_alerts"]: reasons.append("open critical alert")
                 priority_cases.append(PriorityCase(case_id=str(row["case_id"]), title=row["title"], external_case_reference=row["external_case_id"], fraud_type=row["fraud_type"], status=row["status"], workflow_stage=row["workflow_stage"], risk_band=row["risk_band"], risk_score=float(row["score"]) if row["score"] is not None else None, risk_delta=float(row["risk_delta"] or 0), watch_state=row["watch_state"], latest_activity_at=row["latest_activity_at"], vasp_lead_count=row["vasp_lead_count"], nearest_vasp=json_value(row["nearest_vasp"]), related_case_count=row["related_case_count"] or 0, open_critical_alerts=row["open_critical_alerts"] or 0, priority_rank=row["priority_rank"], priority_reason="; ".join(reasons) if reasons else "No persisted priority signals are available."))
-            return DashboardIntelligence(status="READY", critical_cases=totals["critical_cases"] or 0, active_watches=totals["active_watches"] or 0, vasp_leads=totals["vasp_leads"] or 0, high_confidence_vasp_leads=totals["high_confidence_vasp_leads"] or 0, cross_chain_cases=totals["cross_chain_cases"] or 0, unresolved_cross_chain_cases=totals["unresolved_cross_chain_cases"] or 0, related_case_clusters=totals["related_case_clusters"] or 0, open_alerts=totals["open_alerts"] or 0, critical_alerts=totals["critical_alerts"] or 0, priority_cases=priority_cases, recent_intelligence_events=[dict(item) for item in events], risk_movements=[dict(item) for item in movements], risk_factor_summary=[dict(item) for item in factor_rows], generated_at=datetime.now(timezone.utc))
+            return DashboardIntelligence(status="READY", critical_cases=totals["critical_cases"] or 0, active_watches=totals["active_watches"] or 0, vasp_leads=totals["vasp_leads"] or 0, high_confidence_vasp_leads=totals["high_confidence_vasp_leads"] or 0, cross_chain_cases=totals["cross_chain_cases"] or 0, unresolved_cross_chain_cases=totals["unresolved_cross_chain_cases"] or 0, related_case_clusters=totals["related_case_clusters"] or 0, open_alerts=totals["open_alerts"] or 0, critical_alerts=totals["critical_alerts"] or 0, threat_intel_match_cases=totals["threat_intel_match_cases"] or 0, p1_recommendations=totals["p1_recommendations"] or 0, latest_high_priority_recommendation=json_value(totals["latest_high_priority_recommendation"]), priority_cases=priority_cases, recent_intelligence_events=[dict(item) for item in events], risk_movements=[dict(item) for item in movements], risk_factor_summary=[dict(item) for item in factor_rows], generated_at=datetime.now(timezone.utc))
         except asyncpg.PostgresError as exc:
             raise DatabaseError("Dashboard intelligence could not be retrieved") from exc
 
@@ -919,3 +937,37 @@ class PostgresCaseRepository(ReportPersistenceMixin, EvidencePersistenceMixin, C
             if item.severity=="HIGH": summary.high_count+=1
             if item.severity=="MEDIUM": summary.medium_count+=1
         return summary
+
+    async def save_workflow_state(self, case_id: str, state: InvestigationWorkflowState) -> InvestigationWorkflowState:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        self._in_mem_workflows[case_id] = state
+        return state
+
+    async def get_workflow_state(self, case_id: str) -> InvestigationWorkflowState | None:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        return self._in_mem_workflows.get(case_id)
+
+    async def update_workflow_stage(self, case_id: str, stage: str, stage_detail: WorkflowStageDetail) -> InvestigationWorkflowState:
+        if not hasattr(self, "_in_mem_workflows"): self._in_mem_workflows = {}
+        state = self._in_mem_workflows.get(case_id)
+        if not state:
+            state = InvestigationWorkflowState(case_id=case_id, started_at=datetime.now(timezone.utc), stages=[])
+        updated_stages = []
+        replaced = False
+        for s in state.stages:
+            if s.stage == stage_detail.stage:
+                updated_stages.append(stage_detail)
+                replaced = True
+            else:
+                updated_stages.append(s)
+        if not replaced:
+            updated_stages.append(stage_detail)
+        state.stages = updated_stages
+        state.current_stage = stage_detail.stage
+        self._in_mem_workflows[case_id] = state
+        return state
+
+    async def reset_realtime_event(self, event_id: str) -> RealtimeEvent:
+        event = await self.get_realtime_event(event_id)
+        if not event: raise DatabaseError(f"Realtime event {event_id} not found")
+        return event.model_copy(update={"processing_status": RealtimeProcessingStatus.RECEIVED, "error": None})

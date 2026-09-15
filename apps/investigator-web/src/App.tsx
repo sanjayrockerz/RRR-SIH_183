@@ -19,10 +19,11 @@ import { TransactionLedger } from './components/TransactionLedger';
 import { CaseCommandCenter } from './components/CaseCommandCenter';
 import { OperationalDashboard } from './components/OperationalDashboard';
 import { VaspIntelligencePage } from './components/VaspIntelligencePage';
+import { SahyogDemoGateway } from './components/SahyogDemoGateway';
 import { RiskRegistryPage } from './components/RiskRegistryPage';
 import { CaseFusionPage } from './components/CaseFusionPage';
-import { api, caseScreenings, intelligenceSources, screenCase, systemStatus } from './api';
-import type { AddressScreening, Case, IntelligenceSource, Trace, InvestigationOperationalState } from './types';
+import { api, caseScreenings, intelligenceSources, screenCase, systemStatus, caseThreatIntel, refreshCaseThreatIntel, caseRecommendations, refreshCaseRecommendations } from './api';
+import type { AddressScreening, Case, IntelligenceSource, Trace, InvestigationOperationalState, ThreatIntelResponse, RecommendationResponse } from './types';
 import { Dashboard, GenericPage, Intake, Workspace, CasesPage, WalletsPage, EntitiesPage, EvidencePage, AlertsPage, ProviderOperationsPage } from './pages';
 
 const caseRouteAliases: Record<string, string> = {
@@ -66,7 +67,13 @@ const caseRouteLabels: Record<string, string> = {
   reports: 'reports'
 };
 const caseRouteSet = new Set(Object.values(caseRouteAliases));
-const routeFromHash = () => decodeURIComponent(location.hash.slice(1) || 'dashboard');
+const routeFromLocation = () => {
+  // Keep the existing hash navigation, but also make direct browser URLs work.
+  // This is especially important for the standalone SAHYOG gateway: it must
+  // not silently fall back to the RRR dashboard when opened at its pathname.
+  const route = location.hash.slice(1) || (location.pathname !== '/' ? location.pathname : 'dashboard');
+  return decodeURIComponent(route || 'dashboard');
+};
 function parseRoute(value: string) {
   const clean = value.replace(/^#?\/?/, '');
   const [path, query = ''] = clean.split('?');
@@ -79,7 +86,7 @@ function parseRoute(value: string) {
 }
 
 export default function App() {
-  const [route, setRoute] = useState(routeFromHash());
+  const [route, setRoute] = useState(routeFromLocation());
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [trace, setTrace] = useState<Trace | null>(null);
   const [opState, setOpState] = useState<InvestigationOperationalState | null>(null);
@@ -98,7 +105,7 @@ export default function App() {
         return;
       }
       const integration = target.closest('.integration-link');
-      if (integration && integration.textContent?.includes('VASP')) {
+      if (integration && (integration.textContent || '').includes('VASP')) {
         location.hash = 'entities';
         return;
       }
@@ -119,16 +126,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const onHash = () => setRoute(routeFromHash());
-    addEventListener('hashchange', onHash);
+    const onLocationChange = () => setRoute(routeFromLocation());
+    addEventListener('hashchange', onLocationChange);
+    addEventListener('popstate', onLocationChange);
     systemStatus()
       .then(result => setApiState(result.system === 'CONNECTED' ? 'ONLINE' : result.system))
       .catch(() => setApiState('UNAVAILABLE'));
-    return () => removeEventListener('hashchange', onHash);
+    return () => {
+      removeEventListener('hashchange', onLocationChange);
+      removeEventListener('popstate', onLocationChange);
+    };
   }, []);
 
   const routeInfo = parseRoute(route);
   const activeRoute = routeInfo.module;
+
+  // The SAHYOG gateway is an integration boundary, not an RRR workspace page.
+  // Return before composing Shell so none of the investigator chrome can
+  // appear around the gateway.
+  if (activeRoute === 'integration/sahyog-demo') {
+    return <SahyogDemoGateway />;
+  }
 
   function caseHash(caseId: string, module: string, query = '') {
     return `/cases/${caseId}/${caseRouteLabels[module] || module}${query ? `?${query}` : ''}`;
@@ -399,6 +417,7 @@ export default function App() {
 
   return (
     <Shell route={activeRoute} onNavigate={navigate} apiState={apiState} caseData={caseData}>
+      {routeInfo.query.get('source') === 'sahyog-demo' && <div className="sahyog-session-banner"><b>SAHYOG INTEGRATION DEMO SESSION</b><span>Case/intelligence intake is simulated. Live government connectivity is not configured.</span></div>}
       <div className="api-notice">
         <span className={apiState === 'ONLINE' ? 'ok-dot' : 'warn-dot'} /> API {apiState} · Historical blockchain data only
       </div>
@@ -492,24 +511,34 @@ function CaseEntitiesWorkspace({ state }: { state: InvestigationOperationalState
 
 function ThreatWorkspace({ caseData }: { caseData: Case }) {
   const [sources, setSources] = useState<IntelligenceSource[]>([]);
+  const [threat, setThreat] = useState<ThreatIntelResponse | null>(null);
+  const [recommendations, setRecommendations] = useState<RecommendationResponse | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [recommendationBusy, setRecommendationBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { intelligenceSources().then(setSources).catch(e => setError(e instanceof Error ? e.message : 'Threat intelligence sources unavailable')) }, []);
+  useEffect(() => {
+    Promise.all([intelligenceSources(), caseThreatIntel(caseData.case_id), caseRecommendations(caseData.case_id)])
+      .then(([sourceResult, threatResult, recommendationResult]) => { setSources(sourceResult); setThreat(threatResult); setRecommendations(recommendationResult); })
+      .catch(e => setError(e instanceof Error ? e.message : 'Threat intelligence unavailable'));
+  }, [caseData.case_id]);
+  async function refreshThreat() { setBusy(true); setError(''); try { setThreat(await refreshCaseThreatIntel(caseData.case_id)); } catch (e) { setError(e instanceof Error ? e.message : 'Threat intelligence refresh failed'); } finally { setBusy(false); } }
+  async function refreshRecommendations() { setRecommendationBusy(true); setError(''); try { setRecommendations(await refreshCaseRecommendations(caseData.case_id)); } catch (e) { setError(e instanceof Error ? e.message : 'Recommendation refresh failed'); } finally { setRecommendationBusy(false); } }
+  const observations = threat?.observations || [];
   return (
+    <>
     <section className="surface">
-      <div className="panel-title"><div className="eyebrow">CASE / THREAT INTELLIGENCE</div><h3>{sources.length ? `${sources.length} configured source(s)` : 'Provider status unknown'}</h3></div>
+      <div className="panel-title"><div><div className="eyebrow">CASE / THREAT INTELLIGENCE</div><h3>External source-backed indicators</h3></div><button className="secondary" onClick={refreshThreat} disabled={busy}>{busy ? 'REFRESHING...' : 'REFRESH PROVIDERS'}</button></div>
       {error && <div className="error" role="alert">{error}</div>}
       <div className="ledger-table">
-        <div className="ledger-row ledger-head"><span>WALLET</span><span>THREAT OBSERVATION</span><span>SOURCE STATUS</span><span>EVIDENCE</span></div>
-        {caseData.wallets.map(wallet => (
-          <div className="ledger-row" key={`${wallet.chain}-${wallet.address}`}>
-            <span className="mono">{shortValue(wallet.address)}</span>
-            <span>UNKNOWN</span>
-            <span>{sources.length ? sources.map(source => source.status).join(', ') : 'NOT CONFIGURED'}</span>
-            <span>No source-backed threat observation persisted</span>
-          </div>
-        ))}
+        <div className="ledger-row ledger-head"><span>ADDRESS</span><span>SOURCE / RESULT</span><span>CONFIDENCE</span><span>RETRIEVED / REFERENCE</span></div>
+        {observations.length ? observations.map(item => <div className="ledger-row" key={item.observation_id}><span className="mono">{shortValue(item.address)}<small>{item.chain}</small></span><span><strong>{item.source}</strong><small>{item.match_type} · {item.source_version}</small></span><span>{item.confidence == null ? 'N/A' : item.confidence.toFixed(2)}</span><span>{new Date(item.retrieved_at).toLocaleString()} {item.reference && <a href={item.reference} target="_blank" rel="noreferrer">VIEW SOURCE</a>}</span></div>) : <div className="empty-block"><b>{threat?.status || (sources.length ? sources.map(source => source.status).join(', ') : 'NOT_CONFIGURED')}</b><p>No provider result has been persisted. Refresh only queries configured providers; no match is not clearance.</p></div>}
       </div>
     </section>
+    <section className="surface">
+      <div className="panel-title"><div><div className="eyebrow">CASE / INVESTIGATOR RECOMMENDATIONS</div><h3>Deterministic next-step review prompts</h3></div><button className="secondary" onClick={refreshRecommendations} disabled={recommendationBusy}>{recommendationBusy ? 'BUILDING...' : 'REFRESH RECOMMENDATIONS'}</button></div>
+      {recommendations?.recommendations?.length ? <div className="case-table">{recommendations.recommendations.map(item => <article className="case-row" key={item.recommendation_id}><div><strong>{item.priority} · {item.title}</strong><small>{item.code} · {item.reason}</small><small>Evidence: {item.evidence_refs.join(', ') || 'none'} · Ruleset: {item.ruleset_version}</small></div>{item.action_target && <button className="secondary" onClick={() => { location.hash = `/cases/${caseData.case_id}${item.action_target}` }}>VIEW</button>}</article>)}</div> : <div className="empty-block"><b>NO RECOMMENDATION SNAPSHOT</b><p>Refresh recommendations after the case has persisted risk, watch, VASP, fusion, cross-chain, or threat-intelligence state.</p></div>}
+    </section>
+    </>
   );
 }
 
@@ -545,7 +574,7 @@ function TimelineWorkspace({ state }: { state: InvestigationOperationalState | n
   return (
     <section className="surface">
       <div className="panel-title"><div className="eyebrow">CASE / TIMELINE</div><h3>{events.length ? `${events.length} workflow event(s)` : 'No workflow events loaded'}</h3></div>
-      {events.length ? events.map(event => <div className="timeline-row" key={event.event_id}><time>{new Date(event.completed_at || event.started_at).toLocaleString()}</time><div><strong>{event.stage.replaceAll('_',' ')}</strong><p>{event.provider || 'RRR'} | {event.result_count ?? 0} record(s)</p>{event.error && <small>{event.error}</small>}</div></div>) : <div className="empty-block"><b>No persisted workflow events</b><p>Timeline entries appear after case creation, acquisition, risk assessment, realtime processing, and report generation.</p></div>}
+      {events.length ? events.map(event => <div className="timeline-row" key={event.event_id}><time>{new Date(event.completed_at || event.started_at).toLocaleString()}</time><div><strong>{(event.stage || '').replaceAll('_',' ') || 'WORKFLOW STAGE'}</strong><p>{event.provider || 'RRR'} | {event.result_count ?? 0} record(s)</p>{event.error && <small>{event.error}</small>}</div></div>) : <div className="empty-block"><b>No persisted workflow events</b><p>Timeline entries appear after case creation, acquisition, risk assessment, realtime processing, and report generation.</p></div>}
     </section>
   );
 }

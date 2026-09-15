@@ -10,7 +10,7 @@ class ReportPersistenceMixin:
         pool = self._require_pool()
         try:
             async with pool.acquire() as conn:
-                await conn.execute("INSERT INTO investigation_reports(report_id,case_id,report_type,trace_id,title,content,evidence_ids,pattern_ids,assessment_id,content_hash,created_at,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", UUID(report.report_id), UUID(report.case_id), report.report_type.value, UUID(report.trace_id) if report.trace_id else None, report.title, report.content, json.dumps(report.evidence_ids), json.dumps(report.pattern_ids), UUID(report.assessment_id) if report.assessment_id else None, report.content_hash, report.created_at, report.created_by)
+                await conn.execute("INSERT INTO investigation_reports(report_id,case_id,report_type,trace_id,title,content,evidence_ids,pattern_ids,assessment_id,content_hash,created_at,created_by,version,manifest_id,manifest_hash,sections) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)", UUID(report.report_id), UUID(report.case_id), report.report_type.value, UUID(report.trace_id) if report.trace_id else None, report.title, report.content, json.dumps(report.evidence_ids), json.dumps(report.pattern_ids), UUID(report.assessment_id) if report.assessment_id else None, report.content_hash, report.created_at, report.created_by, report.version, UUID(report.manifest_id) if report.manifest_id else None, report.manifest_hash, json.dumps(report.sections))
             return report
         except asyncpg.PostgresError as exc:
             if isinstance(exc, asyncpg.PostgresError):
@@ -22,7 +22,8 @@ class ReportPersistenceMixin:
     def _report(row) -> InvestigationReport:
         def array(value):
             return json.loads(value) if isinstance(value, str) else (value or [])
-        return InvestigationReport(report_id=str(row["report_id"]), case_id=str(row["case_id"]), report_type=ReportType(row["report_type"]), trace_id=str(row["trace_id"]) if row["trace_id"] else None, title=row["title"], content=row["content"], evidence_ids=array(row["evidence_ids"]), pattern_ids=array(row["pattern_ids"]), assessment_id=str(row["assessment_id"]) if row["assessment_id"] else None, content_hash=row["content_hash"], created_at=row["created_at"], created_by=row["created_by"])
+        sections = array(row.get("sections"))
+        return InvestigationReport(report_id=str(row["report_id"]), case_id=str(row["case_id"]), report_type=ReportType(row["report_type"]), trace_id=str(row["trace_id"]) if row["trace_id"] else None, title=row["title"], content=row["content"], evidence_ids=array(row["evidence_ids"]), pattern_ids=array(row["pattern_ids"]), assessment_id=str(row["assessment_id"]) if row["assessment_id"] else None, content_hash=row["content_hash"], created_at=row["created_at"], created_by=row["created_by"], version=row.get("version", "1.0"), manifest_id=str(row["manifest_id"]) if row.get("manifest_id") else None, manifest_hash=row.get("manifest_hash"), sections=sections if isinstance(sections, dict) else {})
 
     async def list_reports(self, case_id: str) -> list[InvestigationReport]:
         pool = self._require_pool()

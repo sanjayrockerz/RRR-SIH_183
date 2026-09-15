@@ -31,6 +31,10 @@ def test_phase_b_operational_and_registry_routes_are_registered():
     assert "/api/v1/cases/{case_id}/evidence/{evidence_id}/chain-of-custody" in paths
     assert "/api/v1/cases/{case_id}/reports" in paths
     assert "/api/v1/cases/{case_id}/reports/{report_id}" in paths
+    assert "/api/v1/cases/{case_id}/vasp-action-package" in paths
+    assert "/api/v1/cases/{case_id}/vasp-action-package/latest" in paths
+    assert "/api/v1/demo/sahyog/login" in paths
+    assert "/api/v1/integrations/sahyog-demo/cases" in paths
     assert "/api/v1/cases/{case_id}/audit-events" in paths
     assert "/api/v1/cases/{case_id}/related" in paths
     assert "/api/v1/wallets/{chain}/{address}" in paths

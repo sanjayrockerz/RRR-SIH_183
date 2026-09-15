@@ -1,0 +1,314 @@
+{
+  "top_15_features": [
+    "in_out_degree_ratio",
+    "degree_imbalance",
+    "log1p_out_degree",
+    "out_degree",
+    "total_tx_count",
+    "log1p_total_degree",
+    "graph_activity_density",
+    "total_degree",
+    "min_out",
+    "unique_receivers",
+    "log1p_unique_counterparties",
+    "mean_activity_gap",
+    "burstiness",
+    "mean_out",
+    "log1p_total_in"
+  ],
+  "shift": {
+    "TEMPORAL": {
+      "in_out_degree_ratio": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.04789425392315068
+      },
+      "degree_imbalance": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.030270806409022195
+      },
+      "log1p_out_degree": {
+        "train_median": 0.0,
+        "test_median": 0.6931471805599453,
+        "median_shift": 0.6931471805599453,
+        "psi": 0.10092123515119583
+      },
+      "out_degree": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.10092123515119583
+      },
+      "total_tx_count": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.26251197661633724
+      },
+      "log1p_total_degree": {
+        "train_median": 1.3862943611198906,
+        "test_median": 1.0986122886681098,
+        "median_shift": -0.2876820724517808,
+        "psi": 0.1781030559708531
+      },
+      "graph_activity_density": {
+        "train_median": 7.927908881900585e-05,
+        "test_median": 5.285272587933723e-05,
+        "median_shift": -2.6426362939668615e-05,
+        "psi": 0.1781030559708531
+      },
+      "total_degree": {
+        "train_median": 3.0,
+        "test_median": 2.0,
+        "median_shift": -1.0,
+        "psi": 0.1781030559708531
+      },
+      "min_out": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.16040364939689417
+      },
+      "unique_receivers": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.10508639261810071
+      },
+      "log1p_unique_counterparties": {
+        "train_median": 1.3862943611198906,
+        "test_median": 1.0986122886681098,
+        "median_shift": -0.2876820724517808,
+        "psi": 0.12444111308173364
+      },
+      "mean_activity_gap": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.6949456177047086
+      },
+      "burstiness": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 1.2593532280659983
+      },
+      "mean_out": {
+        "train_median": 0.0,
+        "test_median": 0.0023998450000000003,
+        "median_shift": 0.0023998450000000003,
+        "psi": 0.10692149002676166
+      },
+      "log1p_total_in": {
+        "train_median": 0.0005143227133938684,
+        "test_median": 0.0029059137399340615,
+        "median_shift": 0.002391591026540193,
+        "psi": 0.5357515841619065
+      }
+    },
+    "LATEST_OBSERVATION": {
+      "in_out_degree_ratio": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.01419672152948497
+      },
+      "degree_imbalance": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.0010011005911502366
+      },
+      "log1p_out_degree": {
+        "train_median": 0.0,
+        "test_median": 0.6931471805599453,
+        "median_shift": 0.6931471805599453,
+        "psi": 0.08717839644426174
+      },
+      "out_degree": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.08717839644426174
+      },
+      "total_tx_count": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 3.15758819576076e-05
+      },
+      "log1p_total_degree": {
+        "train_median": 1.0986122886681098,
+        "test_median": 1.0986122886681098,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "graph_activity_density": {
+        "train_median": 5.285272587933723e-05,
+        "test_median": 5.285272587933723e-05,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "total_degree": {
+        "train_median": 2.0,
+        "test_median": 2.0,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "min_out": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.11598946860301154
+      },
+      "unique_receivers": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.08742006928373186
+      },
+      "log1p_unique_counterparties": {
+        "train_median": 1.0986122886681098,
+        "test_median": 1.0986122886681098,
+        "median_shift": 0.0,
+        "psi": 0.15514787375571903
+      },
+      "mean_activity_gap": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.00042036730242202584
+      },
+      "burstiness": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.007326042163746668
+      },
+      "mean_out": {
+        "train_median": 0.0,
+        "test_median": 0.00226811,
+        "median_shift": 0.00226811,
+        "psi": 0.1323042277417537
+      },
+      "log1p_total_in": {
+        "train_median": 0.000264614986365986,
+        "test_median": 0.0034470769972267347,
+        "median_shift": 0.0031824620108607485,
+        "psi": 0.7236649672617517
+      }
+    },
+    "AGGREGATED_HISTORY": {
+      "in_out_degree_ratio": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.01419672152948497
+      },
+      "degree_imbalance": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.0010011005911502366
+      },
+      "log1p_out_degree": {
+        "train_median": 0.0,
+        "test_median": 0.6931471805599453,
+        "median_shift": 0.6931471805599453,
+        "psi": 0.08717839644426174
+      },
+      "out_degree": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.08717839644426174
+      },
+      "total_tx_count": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 3.451321778176746e-05
+      },
+      "log1p_total_degree": {
+        "train_median": 1.0986122886681098,
+        "test_median": 1.0986122886681098,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "graph_activity_density": {
+        "train_median": 5.285272587933723e-05,
+        "test_median": 5.285272587933723e-05,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "total_degree": {
+        "train_median": 2.0,
+        "test_median": 2.0,
+        "median_shift": 0.0,
+        "psi": 0.16867712165879573
+      },
+      "min_out": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.11598946860301154
+      },
+      "unique_receivers": {
+        "train_median": 0.0,
+        "test_median": 1.0,
+        "median_shift": 1.0,
+        "psi": 0.08742006928373186
+      },
+      "log1p_unique_counterparties": {
+        "train_median": 1.0986122886681098,
+        "test_median": 1.0986122886681098,
+        "median_shift": 0.0,
+        "psi": 0.15514787375571903
+      },
+      "mean_activity_gap": {
+        "train_median": 0.0,
+        "test_median": 0.0,
+        "median_shift": 0.0,
+        "psi": 0.00042036730242202584
+      },
+      "burstiness": {
+        "train_median": 1.0,
+        "test_median": 1.0,
+        "median_shift": 0.0,
+        "psi": 0.007326042163746668
+      },
+      "mean_out": {
+        "train_median": 0.0,
+        "test_median": 0.00226811,
+        "median_shift": 0.00226811,
+        "psi": 0.1323042277417537
+      },
+      "log1p_total_in": {
+        "train_median": 0.0002666744392107549,
+        "test_median": 0.003515777405238451,
+        "median_shift": 0.0032491029660276964,
+        "psi": 0.7117115922306003
+      }
+    }
+  },
+  "class_prevalence": {
+    "TEMPORAL": {
+      "train": 0.04955379778927087,
+      "test": 0.04625734387466454,
+      "delta": -0.003296453914606326
+    },
+    "LATEST_OBSERVATION": {
+      "train": 0.05474049904931809,
+      "test": 0.045148486781486995,
+      "delta": -0.009592012267831095
+    },
+    "AGGREGATED_HISTORY": {
+      "train": 0.05474049904931809,
+      "test": 0.045148486781486995,
+      "delta": -0.009592012267831095
+    }
+  }
+}

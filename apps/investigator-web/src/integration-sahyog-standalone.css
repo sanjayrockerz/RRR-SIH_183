@@ -1,0 +1,14 @@
+/* The gateway is rendered outside Shell, so it owns the viewport edge to edge. */
+.sahyog-gateway {
+  width: 100vw;
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0 0 30px;
+}
+
+@media (max-width: 620px) {
+  .sahyog-gateway {
+    margin: 0;
+  }
+}

@@ -10,7 +10,7 @@ const labels: Record<string, string> = {
 };
 
 const short = (value?: string) => value ? `${value.slice(0, 10)}…${value.slice(-8)}` : '—';
-const pretty = (value: string) => value.replaceAll('_', ' ').toLowerCase().replace(/(^| )\S/g, c => c.toUpperCase());
+const pretty = (value?: string) => (value || '').replaceAll('_', ' ').toLowerCase().replace(/(^| )\S/g, c => c.toUpperCase());
 
 export function ReadableEvidencePage({ caseData }: { caseData: Case | null }) {
   const [items, setItems] = useState<EvidenceRecord[]>([]);
