@@ -159,9 +159,17 @@ export function GraphInspector({ trace, selectedTx }: { trace: Trace; selectedTx
     return customPositions[key] || defaultPositions.get(key) || customPositions[Object.keys(customPositions).find(k => k.endsWith(`:${address.toLowerCase()}`) || k.endsWith(`:${address}`)) || ''] || Array.from(defaultPositions.entries()).find(([k]) => k.endsWith(`:${address.toLowerCase()}`) || k.endsWith(`:${address}`))?.[1] || { x: 0, y: 0 };
   };
 
-  const primaryTransactions = new Set(primaryPath?.transaction_hashes || []);
-  const primaryEdges = new Set(primaryPath?.edge_ids || []);
-  const primaryNodes = new Set((primaryPath?.node_ids || []).map(address => address.toLowerCase()));
+  // The API's primary-path endpoint may be UNATTRIBUTED for a legitimate
+  // trace. In that case the persisted deterministic path is still safe to
+  // highlight; attribution and highlighting are separate concerns.
+  const fallbackPathNodes = primaryPath?.node_ids?.length
+    ? primaryPath.node_ids
+    : (trace.predominant_path?.length ? trace.predominant_path : trace.paths?.[0]?.node_ids || []);
+  const fallbackPathNodePairs = new Set(fallbackPathNodes.slice(0, -1).map((address, index) => `${address.toLowerCase()}→${fallbackPathNodes[index + 1].toLowerCase()}`));
+  const fallbackPathEdges = trace.edges.filter(edge => fallbackPathNodePairs.has(`${edge.source.toLowerCase()}→${edge.target.toLowerCase()}`));
+  const primaryTransactions = new Set(primaryPath?.transaction_hashes?.length ? primaryPath.transaction_hashes : fallbackPathEdges.map(edge => edge.transaction_hash));
+  const primaryEdges = new Set(primaryPath?.edge_ids?.length ? primaryPath.edge_ids : fallbackPathEdges.map(edge => edge.edge_id));
+  const primaryNodes = new Set(fallbackPathNodes.map(address => address.toLowerCase()));
   const edgeFactors = (item: Edge) => risk?.factors.filter(factor => (factor.transaction_hashes || []).includes(item.transaction_hash)) || [];
   const pathRisk = useMemo(() => calculatePathRisk(primaryPath, trace, risk), [primaryPath, trace, risk]);
   const selectedEdgeFactors = (item: Edge) => pathRisk.edgeFactors[item.edge_id] || [];

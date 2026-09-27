@@ -1247,6 +1247,39 @@ async def case_fusion_clusters():
     except DatabaseError as exc:
         return database_failure(exc)
 
+@app.post("/api/v1/case-fusion/generate")
+async def generate_case_fusion_cases():
+    """Create an idempotent persisted case set for an empty Case Fusion workspace.
+
+    These are clearly labelled synthetic investigation records, but they use the
+    normal PostgreSQL case and wallet tables so the same fusion/graph queries used
+    by real intake cases can be exercised from the UI.
+    """
+    shared_wallet = "0x2222222222222222222222222222222222222222"
+    presets = [
+        ("FUSION-LIVE-A", "Shared wallet investment complaint", "Investment fraud"),
+        ("FUSION-LIVE-B", "Shared wallet laundering review", "Money laundering"),
+        ("FUSION-LIVE-C", "Shared wallet payment investigation", "Payment fraud"),
+    ]
+    cases = []
+    existing = {item.external_case_reference: item for item in await repo.list_cases()}
+    for reference, title, fraud_type in presets:
+        case = existing.get(reference) or await repo.create(CaseCreate(
+            title=title,
+            fraud_type=fraud_type,
+            priority="HIGH",
+            external_case_reference=reference,
+            description="Synthetic persisted Case Fusion workspace record; replace with an intake case for production use.",
+            created_by="case-fusion-workspace",
+        ))
+        await repo.add_wallet(case.case_id, WalletCreate(address=shared_wallet, chain=Chain.ETHEREUM))
+        cases.append({"case_id": case.case_id, "external_case_reference": reference})
+    try:
+        clusters = await case_fusion_service.clusters()
+        return {"status": "READY", "cases": cases, "clusters": clusters.clusters, "note": "Synthetic persisted records created through the normal case and wallet tables."}
+    except DatabaseError as exc:
+        return database_failure(exc)
+
 @app.get("/api/v1/cases/{case_id}/evidence",response_model=list[Evidence])
 async def case_evidence(case_id: str):
     await get_case(case_id)
