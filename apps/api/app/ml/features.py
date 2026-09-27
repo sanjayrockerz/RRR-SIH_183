@@ -5,12 +5,11 @@ import json
 import logging
 import math
 from datetime import datetime, timezone
-from pathlib import Path
-
 from ..domain import Chain, normalize_address
+from ..runtime_paths import PROJECT_ROOT
 from .schemas import MLFeatureVector
 
-ROOT = Path(__file__).resolve().parents[4]
+ROOT = PROJECT_ROOT
 METADATA_PATH = ROOT / "models" / "rrr_ethereum_wallet_xgb_v2_metadata.json"
 logger = logging.getLogger("crypto_fraud_intelligence")
 

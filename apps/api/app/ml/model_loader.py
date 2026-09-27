@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from ..config import settings
+from ..runtime_paths import PROJECT_ROOT
 
 logger = logging.getLogger("crypto_fraud_intelligence")
 
-ROOT = Path(__file__).resolve().parents[4]
+ROOT = PROJECT_ROOT
 def _configured_path(value: str) -> Path:
     path = Path(value)
     return path if path.is_absolute() else ROOT / path

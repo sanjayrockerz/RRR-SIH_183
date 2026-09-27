@@ -10,6 +10,7 @@ from .features import FeatureSchemaError, InsufficientDataError, build_feature_v
 from .model_loader import FrozenModelError, get_wallet_risk_model
 from .schemas import MLClassification, MLInferenceResult, MLRiskAssessment, MLModelStatus
 from ..domain import Chain, normalize_address
+from ..runtime_paths import PROJECT_ROOT
 
 logger = logging.getLogger("crypto_fraud_intelligence")
 
@@ -29,7 +30,7 @@ class WalletMLRiskService:
             probability = float(loaded.model.predict_proba([[vector.features[name] for name in order]])[0][1])
             threshold = float(metadata["threshold"])
             classification = MLClassification.HIGH_RISK_LIKE if probability >= threshold else MLClassification.LICIT_LIKE
-            integrity = json.loads((__import__("pathlib").Path(__file__).resolve().parents[4] / "artifacts" / "ml_frozen_model_integrity.json").read_text())
+            integrity = json.loads((PROJECT_ROOT / "artifacts" / "ml_frozen_model_integrity.json").read_text())
             record = {"inference_id": str(uuid4()), "case_id": case_id, "wallet_id": await self._wallet_id(case_id, Chain.ETHEREUM, normalized), "model_name": metadata["model_name"], "chain": Chain.ETHEREUM.value, "address": normalized, "model_version": metadata["model_version"], "feature_schema_version": metadata["feature_schema_version"], "probability": probability, "classification": classification.value, "threshold": threshold, "top_features": top_feature_signals(loaded.model, order, vector.features, limit=5), "feature_hash": vector.feature_hash, "generated_at": generated_at, "observation_cutoff": observation_time, "status": MLModelStatus.READY.value, "limitations": ["HIGH_RISK_LIKE is behavioural model output, not a criminality determination.", "Ethereum-only frozen model; graph, Chainabuse, RiskEngine, Case Fusion, and VASP attribution are not model inputs."], "features": vector.features, "provenance": {"model_path": "models/rrr_ethereum_wallet_xgb_v2.joblib", "model_sha256": integrity["model_sha256"], "metadata_path": "models/rrr_ethereum_wallet_xgb_v2_metadata.json", "metadata_sha256": integrity["metadata_sha256"], "feature_order_source": "frozen metadata", "runtime_source": "PostgreSQL persisted transactions and transaction_transfers", "observation_cutoff": observation_time.isoformat() if observation_time else None}}
             persisted = await self.repository.persist_ml_inference(record)
             logger.info("ml_inference_completed", extra={"case_id": case_id, "chain": Chain.ETHEREUM.value, "address": normalized, "model_version": metadata["model_version"], "classification": classification.value})
