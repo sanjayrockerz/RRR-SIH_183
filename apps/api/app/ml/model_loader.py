@@ -21,7 +21,7 @@ MODEL_PATH = _configured_path(settings.rrr_ml_model_path)
 METADATA_PATH = _configured_path(settings.rrr_ml_metadata_path)
 INTEGRITY_PATH = ROOT / "artifacts" / "ml_frozen_model_integrity.json"
 EXPECTED_MODEL_SHA256 = "5d36a620e91c39e521a953714196bdd09fec28d73560d8c98755514579257da5"
-EXPECTED_METADATA_SHA256 = "0e6db36935b6e21688b1eab24297c3fc2981bb950db00886e5d52f085c29725c"
+EXPECTED_METADATA_SHA256 = "d9b926583f7f991469f3596d210a18b284075a4d3c2c1f8944cf4f1ab39d94ae"
 
 
 class FrozenModelError(RuntimeError):
@@ -37,7 +37,12 @@ class LoadedWalletRiskModel:
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""): digest.update(block)
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            # Git checks out text files with platform-specific newlines on
+            # Windows. Normalize JSON metadata before hashing so the frozen
+            # model integrity check is stable across local and Linux/Render
+            # deployments; binary model artifacts remain byte-for-byte checked.
+            digest.update(block.replace(b"\r\n", b"\n") if path.suffix.lower() == ".json" else block)
     return digest.hexdigest()
 
 

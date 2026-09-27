@@ -2,7 +2,7 @@
     "model_path":  "models/rrr_ethereum_wallet_xgb_v2.joblib",
     "model_sha256":  "5d36a620e91c39e521a953714196bdd09fec28d73560d8c98755514579257da5",
     "metadata_path":  "models/rrr_ethereum_wallet_xgb_v2_metadata.json",
-    "metadata_sha256":  "0e6db36935b6e21688b1eab24297c3fc2981bb950db00886e5d52f085c29725c",
+    "metadata_sha256":  "d9b926583f7f991469f3596d210a18b284075a4d3c2c1f8944cf4f1ab39d94ae",
     "verified_at":  "2026-09-09T05:54:55.3589587Z",
     "status":  "FROZEN_READ_ONLY"
 }
