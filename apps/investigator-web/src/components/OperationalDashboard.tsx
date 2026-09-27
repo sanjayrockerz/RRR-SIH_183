@@ -56,6 +56,7 @@ export function OperationalDashboard({ onNavigate, onOpenCase }: Props) {
   const riskFactors = intelligence?.risk_factor_summary?.slice(0, 5) || [];
   const events = intelligence?.recent_intelligence_events?.slice(0, 7) || [];
   const apiState = system?.system || (error ? 'UNAVAILABLE' : 'LOADING');
+  const persistenceReady = ['CONNECTED', 'READY'].includes(String(system?.dependencies?.postgresql || '').toUpperCase());
   const metricCards = [
     { label: 'CRITICAL CASES', value: intelligence?.critical_cases, context: intelligence ? `${intelligence.critical_alerts} critical alert${intelligence.critical_alerts === 1 ? '' : 's'}` : 'Unavailable', tone: 'critical', route: 'cases', glyph: '!' },
     { label: 'ACTIVE WATCHES', value: intelligence?.active_watches, context: intelligence ? 'Persisted active targets' : 'Unavailable', tone: 'watch', route: 'monitoring', glyph: '◎' },
@@ -69,7 +70,7 @@ export function OperationalDashboard({ onNavigate, onOpenCase }: Props) {
 
   return <section className="ops-dashboard" aria-label="RRR operational intelligence command center">
     <header className="ops-command-header"><div className="ops-command-title"><span className="ops-kicker">RRR / INVESTIGATION COMMAND CENTER</span><h1>Crypto Fraud Intelligence &amp; VASP Attribution</h1></div><div className="ops-header-meta"><span className={`ops-system-badge ${statusClass(apiState)}`}><i /> {apiState}</span><span className="ops-refresh">Updated {refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</span></div></header>
-    <div className={`ops-status-strip ${statusClass(system?.dependencies?.postgresql || apiState)}`} role="status"><span className="ops-status-label"><i /> SYSTEM STATUS</span><strong>{system?.dependencies?.postgresql === 'CONNECTED' ? 'System ready' : 'Storage unavailable'}</strong><span>{system?.dependencies?.postgresql === 'CONNECTED' ? 'Core persistence and intelligence queries are available.' : system?.details?.postgresql || 'Intelligence metrics will populate when persistence is restored.'}</span></div>
+    <div className={`ops-status-strip ${statusClass(system?.dependencies?.postgresql || apiState)}`} role="status"><span className="ops-status-label"><i /> SYSTEM STATUS</span><strong>{persistenceReady ? 'System ready' : 'Storage unavailable'}</strong><span>{persistenceReady ? 'Core persistence and intelligence queries are available.' : system?.details?.postgresql || 'Intelligence metrics will populate when persistence is restored.'}</span></div>
     {error && <div className="ops-inline-error" role="alert">{error}</div>}
 
     <section className="ops-kpi-strip" aria-label="Operational metrics">{metricCards.map((card) => <button className={`ops-kpi-card ${card.tone}`} key={card.label} onClick={() => onNavigate(card.route)}><span className="ops-kpi-top"><span>{card.label}</span><b aria-hidden="true">{card.glyph}</b></span><strong>{valueOrDash(card.value)}</strong><small>{card.context}</small></button>)}</section>
